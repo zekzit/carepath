@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useTranslations } from "next-intl";
-import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
+import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import QRCode from "qrcode";
+import { DataTable, type DataTableColumn, type DataTableExtraAction } from "@/components/admin/DataTable";
 import { RecordFormSheet, type FieldConfig, type FormValues } from "@/components/admin/RecordFormSheet";
 import { NODE_TYPES, nodesApi, type Building, type FacilityNode, type Floor, type NodeType } from "@/lib/api/facility";
 import { bool, num, optionalStr, str } from "@/lib/admin-form-utils";
+import type { AppLocale } from "@/i18n/locales";
+import { EyeIcon, XIcon } from "@/components/icons";
 
 function nodeToFormValues(node: FacilityNode): FormValues {
   return {
@@ -39,16 +42,20 @@ export function NodesSection({
   refetch: () => Promise<void>;
 }) {
   const t = useTranslations("admin");
+  const locale = useLocale() as AppLocale;
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<FacilityNode | null>(null);
+  const [qrNode, setQrNode] = useState<FacilityNode | null>(null);
 
   const nodeTypeLabel = (type: NodeType) => t(`nodeType.${type}` as const);
 
-  function floorLabel(floorId: number): string {
+  function floorLabel(floorId: number, currentLocale: AppLocale = locale): string {
     const floor = floors.find((f) => f.id === floorId);
     if (!floor) return `#${floorId}`;
     const building = buildings.find((b) => b.id === floor.building);
-    return `${building ? building.code : "?"} · ${floor.name_th} (L${floor.level_no})`;
+    const floorName = currentLocale === "th" ? floor.name_th : floor.name_en;
+    const buildingCode = building ? building.code : "?";
+    return `${buildingCode} · ${floorName} (L${floor.level_no})`;
   }
 
   const fields: FieldConfig[] = [
@@ -131,6 +138,10 @@ export function NodesSection({
     setSheetOpen(true);
   }
 
+  function openQrModal(row: FacilityNode) {
+    setQrNode(row);
+  }
+
   async function handleSubmit(values: FormValues) {
     const nodeType = str(values.node_type) as NodeType;
     const isServicePoint = nodeType === "SERVICE_POINT";
@@ -167,6 +178,16 @@ export function NodesSection({
     await refetch();
   }
 
+  const extraActions: DataTableExtraAction<FacilityNode>[] = [
+    {
+      key: "view-qr",
+      label: t("viewNodeQrCta"),
+      icon: <EyeIcon width={14} height={14} />,
+      onClick: openQrModal,
+      disabled: (row) => !row.location_qr_code,
+    },
+  ];
+
   return (
     <>
       <DataTable
@@ -180,6 +201,7 @@ export function NodesSection({
         onDelete={handleDelete}
         emptyTitle={t("nodesEmptyTitle")}
         emptyDescription={t("nodesEmptyDescription")}
+        extraActions={extraActions}
       />
       {sheetOpen && (
         <RecordFormSheet
@@ -192,6 +214,127 @@ export function NodesSection({
         cancelLabel={t("cancel")}
         />
       )}
+      {qrNode && (
+        <NodeQrModal
+          node={qrNode}
+          floorLabel={floorLabel(qrNode.floor)}
+          onClose={() => setQrNode(null)}
+        />
+      )}
     </>
+  );
+}
+
+function NodeQrModal({
+  node,
+  floorLabel,
+  onClose,
+}: {
+  node: FacilityNode;
+  floorLabel: string;
+  onClose: () => void;
+}) {
+  const t = useTranslations("admin");
+  const locale = useLocale() as AppLocale;
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const nodeName = locale === "th" ? node.name_th : node.name_en;
+  const nodeType = t(`nodeType.${node.node_type}` as const);
+
+  useEffect(() => {
+    // Skip the QR generation entirely when there's no code to encode — the
+    // render branch shows the empty state directly, so no setState in here.
+    if (!node.location_qr_code) return;
+    let cancelled = false;
+    QRCode.toDataURL(node.location_qr_code, { width: 260, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.location_qr_code]);
+
+  async function handleCopy() {
+    if (!node.location_qr_code) return;
+    try {
+      await navigator.clipboard.writeText(node.location_qr_code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore — clipboard might be blocked; the text is also visible below
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("nodeQrModalTitle")}
+    >
+      <div className="flex w-full max-w-[420px] flex-col gap-4 rounded-[20px] bg-white p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11.5px] font-medium uppercase tracking-wide text-[var(--ink-faint)]">
+              {nodeType}
+            </div>
+            <div className="mt-0.5 text-[16px] font-bold text-[var(--ink)]">{nodeName}</div>
+            <div className="mt-0.5 text-[12px] text-[var(--ink-muted)]">{floorLabel}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("nodeQrCloseCta")}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] hover:bg-[var(--surface-app)]"
+          >
+            <XIcon width={16} height={16} stroke="var(--ink-muted)" />
+          </button>
+        </div>
+
+        {node.location_qr_code ? (
+          <>
+            <div className="flex items-center justify-center rounded-2xl bg-[var(--surface-app)] p-4">
+              {dataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL generated client-side; next/image can't optimize this
+                <img
+                  src={dataUrl}
+                  alt={t("nodeQrModalTitle")}
+                  width={260}
+                  height={260}
+                  className="h-[260px] w-[260px]"
+                />
+              ) : (
+                <div className="flex h-[260px] w-[260px] items-center justify-center text-[12.5px] text-[var(--ink-muted)]">
+                  {t("loading")}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-app)] px-3 py-2">
+              <code className="flex-1 truncate font-mono text-[12.5px] text-[var(--ink)]">{node.location_qr_code}</code>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="rounded-md bg-[var(--brand-ink)] px-3 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                {copied ? t("nodeQrCopiedHint") : t("nodeQrCopyCodeCta")}
+              </button>
+            </div>
+
+            <div className="text-center text-[11.5px] text-[var(--ink-muted)]">{t("nodeQrPrintHint")}</div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-app)] px-4 py-8 text-center text-[12.5px] text-[var(--ink-muted)]">
+            <div className="font-semibold text-[var(--ink)]">{t("nodeQrModalEmptyTitle")}</div>
+            <div>{t("nodeQrModalEmptyBody")}</div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -10,6 +10,22 @@ export type DataTableColumn<T> = {
   render: (row: T) => ReactNode;
 };
 
+export type DataTableExtraAction<T> = {
+  /** Stable id used as the React key. */
+  key: string;
+  /** `aria-label` for the icon button — important for screen readers since the
+   *  button is icon-only. */
+  label: string;
+  icon: ReactNode;
+  onClick: (row: T) => void;
+  /** Optional — if it returns true the button is hidden for that row. */
+  hidden?: (row: T) => boolean;
+  /** Optional — if it returns true the button renders as disabled. */
+  disabled?: (row: T) => boolean;
+  /** Optional tooltip text; falls back to `label`. */
+  title?: string;
+};
+
 type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
   rows: T[];
@@ -21,6 +37,13 @@ type DataTableProps<T> = {
   onDelete: (row: T) => Promise<void> | void;
   emptyTitle: string;
   emptyDescription: string;
+  /**
+   * Optional resource-specific actions rendered at the front of the per-row
+   * actions column (leftmost), before the default edit/delete buttons. Kept
+   * here rather than on each resource section so the icon-only styling stays
+   * consistent across the admin.
+   */
+  extraActions?: DataTableExtraAction<T>[];
 };
 
 /**
@@ -40,6 +63,7 @@ export function DataTable<T>({
   onDelete,
   emptyTitle,
   emptyDescription,
+  extraActions,
 }: DataTableProps<T>) {
   const t = useTranslations("admin");
   const [confirmingKey, setConfirmingKey] = useState<string | number | null>(null);
@@ -101,6 +125,7 @@ export function DataTable<T>({
                 const key = rowKey(row);
                 const isConfirming = confirmingKey === key;
                 const isDeleting = deletingKey === key;
+                const visibleExtras = extraActions?.filter((action) => !action.hidden?.(row)) ?? [];
                 return (
                   <tr key={key} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-app)]">
                     {columns.map((column) => (
@@ -110,6 +135,22 @@ export function DataTable<T>({
                     ))}
                     <td className="px-4 py-3 text-right align-top">
                       <div className="flex justify-end gap-1.5">
+                        {visibleExtras.map((action) => {
+                          const isDisabled = action.disabled?.(row) ?? false;
+                          return (
+                            <button
+                              key={action.key}
+                              type="button"
+                              onClick={() => action.onClick(row)}
+                              disabled={isDisabled}
+                              aria-label={action.label}
+                              title={action.title ?? action.label}
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-app)] disabled:opacity-40"
+                            >
+                              {action.icon}
+                            </button>
+                          );
+                        })}
                         {isConfirming && (
                           <button
                             type="button"
