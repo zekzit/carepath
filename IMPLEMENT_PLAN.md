@@ -164,18 +164,40 @@ template อัตโนมัติ → เดินหน้าทีละ st
 
 ## Phase 3 — Mobile (Patient Portal)
 
-### Backend
+### Backend — เสร็จแล้ว (ทดสอบผ่าน curl ทุก state)
 
-- Endpoint อ่านอย่างเดียว แยก ViewSet ต่างหากจาก Admin: `GET /api/visits/by-token/{qr_token}` — `permission_classes = [AllowAny]` แบบถาวร (ไม่ใช่ของชั่วคราวแบบ Admin) ไม่ auth ตาม design แต่ **ห้าม** ใช้ path param ที่เดาง่าย ต้องเป็น `qr_token` (64 chars สุ่ม) เท่านั้น ห้าม expose ผ่าน `Visit.id` แบบ sequential
-- Response รวม nested: patient info, steps (พร้อม prerequisite เพื่อ group parallel ได้เหมือน mock ปัจจุบัน), next actionable step, queue ticket ปัจจุบัน (ถ้ามี) — ออกแบบ serializer ให้ shape ตรงกับ `VisitView` ใน [lib/portal-data.ts](frontend/lib/portal-data.ts) เพื่อ diff น้อยที่สุดตอน swap
+- [x] `GET /api/visits/by-token/{qr_token}` (`visits/views.py::visit_by_token`) — plain `@api_view` แยกจาก Admin ViewSet ทั้งหมด, `AllowAny` ถาวร, lookup ด้วย `qr_token` เท่านั้น (404 ถ้าไม่เจอ ไม่ใช่ 500) ไม่ผ่าน `Visit.id`
+- [x] `serialize_public_visit(visit)` เขียนเป็นฟังก์ชัน compose ธรรมดา (ไม่ใช่ DRF Serializer เพราะข้าม 5 model) คำนวณ `next_step` เอง: ให้ความสำคัญ step ที่ `IN_PROGRESS` ก่อน ถ้าไม่มีค่อยหา step แรกที่ `PENDING` และ prerequisite ครบ `DONE` ทั้งหมด (กติกาเดียวกับ Admin's start action ทุกตัว — SKIPPED ไม่นับ) ถ้าไม่มี step ไหนเข้าเงื่อนไขเลย (visit เสร็จหมดแล้ว) คืน `next_step: null` — ทดสอบครบทั้ง 3 สถานะ: (1) ไม่มี next_step, (2) มี next_step แต่ยัง `PENDING`/ไม่มีตั๋วคิว (ยังไม่ถูก start), (3) `IN_PROGRESS` พร้อม `queue_ticket`
+- [x] เขียนไว้ให้ Kiosk (Phase 4) เรียก endpoint เดียวกันนี้ได้เลย (`serialize_public_visit` เป็น named function แยก ไม่ผูกกับ view)
 
-### Frontend
+**Response shape ที่ทดสอบแล้ว** (ดู [frontend/lib/api/public-visit.ts](frontend/lib/api/public-visit.ts) สำหรับ TypeScript type คู่กัน):
+```jsonc
+{
+  "qr_token": "...", "status": "IN_PROGRESS", "visit_date": "2026-09-19", "uses_wheelchair": false,
+  "patient": { "full_name": "...", "hn_code": "...", "preferred_language": "th" },
+  "steps": [ { "id": 9, "sequence_order": 1, "status": "IN_PROGRESS", "prerequisite_steps": [],
+               "started_at": "...", "completed_at": null,
+               "service_point": { "id": 1, "name_th": "...", "name_en": "...", "department_th": "...", "department_en": "..." } } ],
+  "next_step": { /* same shape as one item of steps[], or null */ },
+  "queue_ticket": { "ticket_number": 4, "status": "WAITING", "current_number": 2 } // or null
+}
+```
 
-- แทนที่ `getVisitByQrToken()` mock ด้วย fetch จริงใน `app/visit/[token]/page.tsx` (ยังเป็น server component ได้เหมือนเดิม)
-- `PortalLocaleProvider` เปลี่ยน `initialLocale` จาก hardcode เป็นค่าจาก `visit.patient.preferred_language` ที่ backend ส่งมาจริง
-- เพิ่ม polling (ตาม MODELS.md S6 ตัดสินใจแล้วว่าใช้ frontend polling ไม่ทำ push) — client component ดึงคิว/สถานะ step ซ้ำทุก ~10s ด้วย `setInterval` + `fetch` (pattern เดียวกับ health check ใน `app/page.tsx`)
+หมายเหตุ: **ไม่มี field `walkTimeMinutes`/`avgWaitMinutes`/`remaining` สำเร็จรูปจาก backend** — เพราะไม่มี routing engine คำนวณระยะทางจริง (Edge model มี `distance_m`/`walk_time_sec` แต่ยังไม่มี pathfinding logic ใช้งาน อยู่นอก scope ทั้งแผนนี้) และไม่มี field เก็บสถิติเวลารอเฉลี่ย — ส่วน "เหลืออีกกี่คิว" คำนวณฝั่ง frontend ได้ตรง ๆ จาก `ticket_number - current_number` ตามที่ MODELS.md S6 ระบุไว้แล้ว
 
-### Definition of Done
+### Frontend — เสร็จแล้ว (ทดสอบผ่าน browser จริง + cross-check ด้วย curl, ครบทั้ง 3 state)
+
+- [x] `lib/api/public-visit.ts` (ใหม่) — type ตรงกับ response จริง + `fetchVisitByTokenServer()`/`fetchVisitByTokenClient()` ตามที่ออกแบบไว้ + `serviceStepLocationName()` helper (เลือก `department_th/en` ก่อน ถ้าว่างค่อย fallback ไป `name_th/en`)
+- [x] `app/visit/[token]/page.tsx` — fetch ฝั่ง server ครั้งแรก, `notFound()` ถ้าไม่เจอ token (ทดสอบ token มั่ว ได้ 404 จริง ไม่ crash)
+- [x] `PatientPortalView.tsx` — stateful, polling ทุก 10s, locale จาก `preferred_language` จริง
+- [x] `StepTimeline.tsx`/`NextStepCard.tsx`/`QueueWidget.tsx` ปรับ field ใหม่ครบ + เพิ่ม `SKIPPED` status handling + 2 สถานะใหม่ (complete-card เมื่อ `next_step===null`, ข้อความ "ยังไม่ได้รับหมายเลขคิว" เมื่อยังไม่มีตั๋ว)
+- [x] Kiosk demo data (`KioskView.tsx`/`app/kiosk/[deviceCode]/page.tsx`) ปรับ shape ตามใหม่ ไม่แตะ behavior อื่น
+- [x] ลบ mock เดิม (`VisitView`/`VisitStepView`/`getVisitByQrToken`/`MOCK_VISIT`) ออกจาก `lib/portal-data.ts` เก็บ `KioskDevice`/`getKioskByDeviceCode` ไว้ (ยัง Phase 4 scope)
+- [x] **เจอและแก้บั๊กที่เกี่ยวข้องระหว่างทาง**: [lib/api/client.ts](frontend/lib/api/client.ts)'s `apiFetch` เดิมจะยัด `Content-Type: application/json` ทับทุก body รวมถึง `FormData` — จะพังตอน Phase 5 อัปโหลดไฟล์ แก้ให้ข้าม `FormData` แล้ว (แก้พร้อมกับตอนเตรียม Phase 5 backend)
+
+**ตรวจสอบอิสระ (ทำเองอีกรอบ)**: อ่านโค้ด `public-visit.ts` เอง, รัน `eslint`+`next build` (clean cache) ซ้ำเองผ่านทั้งคู่, สร้าง Visit ใหม่จริงแล้วเปิด `/visit/<token>` เห็น state 2 ถูกต้อง (มี next step แต่ยังไม่มีคิว), สั่ง `start` ผ่าน API ตรง ๆ แล้ว**ปล่อยหน้าเว็บทิ้งไว้เฉย ๆ ไม่ reload** รอ 10 วินาที เห็น UI เปลี่ยนเป็น state 3 เอง (มีเลขคิวจริง, คำนวณ "อีกประมาณ N คิว" ถูกต้องตรงกับ `ticket_number - current_number`) — ยืนยัน polling ทำงานจริง ไม่ใช่แค่ตามที่ agent รายงาน
+
+### Definition of Done — ผ่านแล้ว
 
 เปิด `/visit/<qr_token จริงจาก DB>` เห็นข้อมูลตรงกับที่เจ้าหน้าที่เพิ่งลงทะเบียน/อัปเดตใน Admin
 (phase 2) และเห็นการเปลี่ยนแปลงคิว/step โดยไม่ต้อง refresh มือ (polling)
@@ -184,23 +206,24 @@ template อัตโนมัติ → เดินหน้าทีละ st
 
 ## Phase 4 — Kiosk Portal
 
-### Backend
+### Backend — เสร็จแล้ว (ทดสอบผ่าน curl)
 
-- Endpoint หา kiosk ด้วย `device_code`: `GET /api/facility/kiosks/{device_code}` (query `Node` filter `node_type=KIOSK`) — ใช้แสดง device label เหมือนเดิม
-- Scan flow ใช้ endpoint เดียวกับ phase 3 (`by-token`) — ไม่ต้องสร้าง endpoint ใหม่ เพราะผลลัพธ์ที่ต้องการเหมือนกันทุกประการ
-- (ถ้าต้องการ track ตำแหน่งผู้ป่วยจาก kiosk) เพิ่ม `PATCH /api/visits/{id}/current-node` ให้ kiosk ยิงอัปเดต `Visit.current_node` เป็น node ของ kiosk ตอน scan สำเร็จ — งานนี้เป็น nice-to-have ไม่ block DoD
+- [x] `GET /api/facility/kiosks/{device_code}` (`facility/views.py::kiosk_by_device_code`) — หา `Node` ที่ `node_type=KIOSK` ด้วย `device_code`, คืน `{device_code, name_th, name_en}`, 404 ถ้าไม่เจอหรือ node_type ไม่ตรง (ทดสอบทั้งสองเคส)
+- [x] **เพิ่มเติมจากแผนเดิม**: `GET /api/visits/by-hn-today/{hn_code}` (`visits/views.py::visit_by_hn_today`) — เหตุผลที่ต้องมี: `qr_token` เป็นสตริงสุ่ม 64 ตัวอักษร ไม่มีทางให้ผู้ป่วย "พิมพ์" เองได้จริงตอนใช้ manual fallback ตามที่ระบุไว้เดิม ("กรอก qr_token/HN") จึงต้องมี path ค้นด้วย HN แทน — หา Visit ของวันนี้เท่านั้น (ไม่ใช่ทั้งประวัติ เพื่อจำกัดขอบเขตข้อมูลที่ endpoint แบบไม่ auth จะเปิดเผยได้จาก HN ซึ่งไม่ใช่ค่าสุ่มเหมือน qr_token) ใช้ `serialize_public_visit()` ตัวเดียวกับ Phase 3 ทั้งหมด คืน response shape เหมือนกันเป๊ะ — ทดสอบครบ (เจอ, ไม่เจอ HN, เจอ HN แต่ไม่มีนัดวันนี้)
+- [x] Scan flow (ทั้งกล้องจริงใน Phase 6 และ manual fallback ใน phase นี้) ใช้ endpoint เดียวกับ Phase 3 ทั้งคู่ ไม่ต้องสร้างใหม่
+- ไม่ได้ทำ `PATCH .../current-node` (nice-to-have ตามแผนเดิม ไม่ block DoD)
 
 ### Frontend
 
 - `KioskView` ตอนนี้มีปุ่ม demo "จำลองการสแกนสำเร็จ" ล้วน ๆ — สิ่งที่ต้องทำใน phase นี้คือเพิ่ม
-  **manual fallback**: ช่อง input กรอก `qr_token`/HN ที่ปุ่ม "หรือแตะหน้าจอเพื่อกรอกเลข HN" (มี UI
-  อยู่แล้วในมockup) ให้ยิง fetch จริงไปที่ endpoint เดียวกับ patient portal
+  **manual fallback**: ช่อง input กรอก **HN** (ไม่ใช่ qr_token ตามเหตุผลด้านบน) ที่ปุ่ม "หรือแตะหน้าจอเพื่อกรอกเลข HN"
+  (มี UI อยู่แล้วในมockup) ให้ยิง fetch จริงไปที่ `GET /api/visits/by-hn-today/{hn_code}`
 - การอ่านกล้อง/ถอดรหัส QR จริงในเบราว์เซอร์ **ไม่รวมอยู่ใน phase นี้** ย้ายไป **Phase 6** ทั้งหมด
 
 ### Definition of Done
 
-กรอก `qr_token`/HN จริงที่หน้าจอ kiosk (หรือกดปุ่ม demo ที่ยัง fetch ของจริงแทน mock) แล้วเห็นข้อมูล
-visit เดียวกับที่ patient portal เห็น, กด "เสร็จแล้ว กลับสู่หน้าหลัก" reset กลับหน้าสแกนได้
+กรอก HN จริงที่หน้าจอ kiosk แล้วเห็นข้อมูล visit เดียวกับที่ patient portal เห็น (backend ผ่านแล้ว
+รอ frontend), กด "เสร็จแล้ว กลับสู่หน้าหลัก" reset กลับหน้าสแกนได้
 
 ---
 
@@ -209,20 +232,24 @@ visit เดียวกับที่ patient portal เห็น, กด "เ
 งานที่ตัดออกจาก Phase 1 มาไว้ตรงนี้: เครื่องมือ "ลาก" ตำแหน่ง Node และวาดเส้น Edge บนภาพผังพื้น
 ตามที่ระบุไว้ใน [MODELS.md § 1](MODELS.md) (`Floor.plan_image`, `Floor.plan_scale_m_per_px`)
 
-### Backend
+### Backend — เสร็จแล้ว (ทดสอบผ่าน curl)
 
-- Endpoint อัปโหลด `Floor.plan_image` ต้องเปิด `MultiPartParser`/`FormParser` บน `FloorViewSet` (ฟิลด์นี้เป็น `ImageField` — CRUD serializer ปกติจาก phase 1 อาจต้องปรับ parser class เพิ่ม)
-- (ถ้าต้องการ auto-calc) endpoint หรือ serializer method คำนวณ `Edge.distance_m` จาก `pos_x`/`pos_y` ของ `from_node`/`to_node` × `Floor.plan_scale_m_per_px` ให้อัตโนมัติเมื่อแอดมินไม่กรอกระยะเอง (ตามที่ MODELS.md ระบุไว้)
+- [x] `Floor.plan_image` เปิดใช้งานใน `FloorSerializer` แล้ว — **ไม่ต้องเปิด `MultiPartParser`/`FormParser` เพิ่มเองอย่างที่แผนเดิมคาดไว้** เพราะ DRF's `DEFAULT_PARSER_CLASSES` (ค่า default ของ framework เอง ไม่ได้ override ใน settings.py) รวม `MultiPartParser`/`FormParser` อยู่แล้ว ทดสอบอัปโหลดจริงผ่าน `curl -F` สำเร็จ ได้ URL เต็ม (`http://127.0.0.1:8000/media/floor_plans/...`) กลับมาใน response พร้อมใช้เป็น `<img src>` ตรง ๆ
+- [x] `Edge.distance_m` เป็น optional แล้วใน `EdgeSerializer.validate()` — auto-calculate จาก `pos_x`/`pos_y` ของ `from_node`/`to_node` × `from_node.floor.plan_scale_m_per_px` เมื่อไม่ได้ส่งมา (ทดสอบตรงกับการคำนวณ Pythagorean ด้วยมือ) — **เงื่อนไข**: ทั้งสอง node ต้องอยู่ `floor` เดียวกัน และ floor นั้นต้อง calibrate scale ไว้แล้ว ไม่งั้น 400 ให้กรอกเอง (ทดสอบทั้งเคส auto-calc สำเร็จ, เคส floor ไม่ได้ calibrate ต้อง reject, และเคสกรอก `distance_m` เองยังทำงานตามปกติ)
 
-### Frontend
+**อัปเดต API contract จาก Phase 1**: `PATCH /api/facility/floors/{id}` รับ `plan_image` เพิ่มได้แล้ว (multipart), `POST/PATCH /api/facility/edges` รับ `distance_m` เป็น optional แล้ว
 
-- Canvas/SVG overlay บนรูป `plan_image`: แสดงตำแหน่ง Node ปัจจุบัน (จาก `pos_x`/`pos_y`), ลากเพื่อย้ายตำแหน่ง (อัปเดตกลับด้วย `PATCH`), คลิก 2 Node เพื่อสร้าง Edge ระหว่างกัน
-- เครื่องมือ calibrate scale: ลากเส้นบนภาพเทียบกับระยะจริงที่กรอก แล้วคำนวณ/บันทึก `plan_scale_m_per_px`
+### Frontend — ยังไม่ได้ทำ
+
+- Canvas overlay บนรูป `plan_image`: แสดงตำแหน่ง Node ปัจจุบัน (จาก `pos_x`/`pos_y`), ลากเพื่อย้ายตำแหน่ง (อัปเดตกลับด้วย `PATCH`), เลือก 2 Node เพื่อสร้าง Edge ระหว่างกัน (เว้น `distance_m` ว่างให้ backend auto-calc)
+- เครื่องมือ calibrate scale: คลิก 2 จุดบนภาพเทียบกับระยะจริงที่กรอก แล้วคำนวณ/บันทึก `plan_scale_m_per_px`
+- อัปโหลด `plan_image` ต้องส่งเป็น `FormData` ตรง ๆ ผ่าน `apiFetch` (แก้ [lib/api/client.ts](frontend/lib/api/client.ts) แล้วให้ไม่ยัด `Content-Type: application/json` ทับ `FormData` body — เดิมมีบั๊กนี้อยู่ พบและแก้แล้วระหว่างเตรียม phase นี้) **ห้ามใช้ `createResourceClient`** สำหรับ upload เพราะมัน `JSON.stringify` ทุกครั้ง
 
 ### Definition of Done
 
 อัปโหลดภาพผังพื้นให้ Floor หนึ่งชั้น, ลากวางตำแหน่ง Node บนภาพได้ตรงจุดจริง, วาด Edge เชื่อม
-Node สองจุดแล้วระบบคำนวณ `distance_m` ให้อัตโนมัติจาก scale ที่ calibrate ไว้
+Node สองจุดแล้วระบบคำนวณ `distance_m` ให้อัตโนมัติจาก scale ที่ calibrate ไว้ (backend ผ่านแล้ว
+รอ frontend)
 
 ---
 
