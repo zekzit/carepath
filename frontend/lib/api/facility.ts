@@ -1,6 +1,35 @@
 import { apiFetch } from "./client";
 import { createResourceClient } from "./resource";
 
+// Phase 7: kiosk node payload, used by the Kiosk Portal to compute a
+// straight-line bearing from the kiosk to the patient's next service point.
+// Mirrors `backend/facility/views.py::kiosk_by_device_code`.
+export type KioskInfo = {
+  device_code: string;
+  name_th: string;
+  name_en: string;
+  pos_x: number;
+  pos_y: number;
+  floor_id: number;
+  floor_scale_m_per_px: number | null;
+  floor_name_th: string;
+  floor_name_en: string;
+};
+
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
+
+/**
+ * Server-only — used for the fast first paint of /kiosk/[deviceCode]. No
+ * cookie forwarding needed: this endpoint is public/AllowAny permanently.
+ * Returns null on any non-2xx response (including 404 for an unknown kiosk
+ * device_code), so the caller can decide to render notFound() or a fallback.
+ */
+export async function fetchKioskByDeviceCodeServer(deviceCode: string): Promise<KioskInfo | null> {
+  const res = await fetch(`${BACKEND_URL}/api/facility/kiosks/${encodeURIComponent(deviceCode)}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export type Building = {
   id: number;
   name_th: string;

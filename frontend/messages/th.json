@@ -315,6 +315,8 @@
     "printQrDocTitle": "QR Code สำหรับผู้ป่วย",
     "printQrLinkLabel": "ลิงก์สำหรับผู้ป่วย",
     "printQrPopupBlocked": "เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาตป๊อปอัปแล้วลองใหม่",
+    "openPatientLink": "เปิดลิงก์ผู้ป่วย",
+    "openPatientLinkTitle": "เปิดหน้า Patient Portal ของ visit นี้ในแท็บใหม่",
     "visitStepsEmpty": "แม่แบบเส้นทางนี้ยังไม่มีขั้นตอน",
     "adHocStep": "เพิ่มนอกแผนเดิม",
     "stepActionStart": "เริ่ม",
@@ -374,6 +376,30 @@
     "cameraResolving": "กำลังตรวจสอบข้อมูล...",
     "cameraNotFound": "ไม่พบข้อมูลนัดหมายสำหรับ QR นี้ กำลังสแกนใหม่อีกครั้ง...",
     "cameraUnavailableTitle": "ใช้กล้องไม่ได้",
-    "cameraUnavailableBody": "กรุณาแตะปุ่มด้านล่างเพื่อกรอกเลข HN แทน"
+    "cameraUnavailableBody": "กรุณาแตะปุ่มด้านล่างเพื่อกรอกเลข HN แทน",
+    "listTitle": "เลือกตู้ Kiosk",
+    "listSubtitle": "เลือกตู้ kiosk ในระบบเพื่อเปิดหน้าจอนำทางของตู้นั้น",
+    "listSearchPlaceholder": "ค้นหาด้วยชื่อหรือ device code",
+    "listDeviceCodeLabel": "Device code",
+    "listEmptyAdmin": "ยังไม่มีตู้ kiosk ในระบบ",
+    "listEmptySearch": "ไม่พบตู้ kiosk ที่ตรงกับคำค้นหา",
+    "direction": {
+      "title": "ทิศทางจาก kiosk",
+      "floorChange": "ไปชั้น {floor}",
+      "arrived": "คุณอยู่ที่จุดหมายแล้ว",
+      "distanceMeters": "ระยะทาง ~{value} ม.",
+      "distanceUnknown": "ระยะทางไม่ทราบ (ยังไม่ได้ calibrate มาตราส่วน)",
+      "ariaCompass": "เข็มทิศชี้ทิศ{cardinal} ประมาณ {bearing} องศา",
+      "cardinalLong": {
+        "0": "เหนือ",
+        "1": "ตะวันออกเฉียงเหนือ",
+        "2": "ตะวันออก",
+        "3": "ตะวันออกเฉียงใต้",
+        "4": "ใต้",
+        "5": "ตะวันตกเฉียงใต้",
+        "6": "ตะวันตก",
+        "7": "ตะวันตกเฉียงเหนือ"
+      }
+    }
   }
 }

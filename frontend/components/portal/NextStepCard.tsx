@@ -8,7 +8,10 @@ type Scale = "default" | "kiosk";
 
 // No walk-time estimate here — there is no routing engine/distance data
 // behind this endpoint (see lib/api/public-visit.ts), so this only shows
-// where to go, not how long it takes.
+// where to go, not how long it takes. The Kiosk Portal pairs this card
+// with DirectionBlock (Phase 7), which renders a straight-line bearing +
+// distance from the kiosk node using the service_point's newly-exposed
+// pos_x/pos_y and floor_scale_m_per_px.
 export function NextStepCard({ nextStep, scale = "default" }: { nextStep: PublicVisitStep; scale?: Scale }) {
   const t = useTranslations("patient");
   const locale = useLocale() as AppLocale;

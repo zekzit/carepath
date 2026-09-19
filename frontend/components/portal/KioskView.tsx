@@ -3,20 +3,22 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import jsQR from "jsqr";
 import { useLocale, useTranslations } from "next-intl";
-import type { KioskDevice } from "@/lib/portal-data";
+import type { KioskInfo } from "@/lib/api/facility";
 import type { AppLocale } from "@/i18n/locales";
 import type { PublicVisit } from "@/lib/api/public-visit";
 import { fetchVisitByHnTodayClient, fetchVisitByTokenClient, serviceStepLocationName } from "@/lib/api/public-visit";
+import { computeDirection } from "@/lib/direction";
 import { extractQrToken } from "@/lib/qr-token";
 import { PortalLocaleProvider } from "./locale-context";
 import { LanguageToggle } from "./LanguageToggle";
 import { NextStepCard } from "./NextStepCard";
+import { DirectionBlock } from "./DirectionBlock";
 import { QueueWidget } from "./QueueWidget";
 import { CameraOffIcon, KeyboardIcon, MapPinIcon, QrScanIcon, RefreshIcon } from "@/components/icons";
 
 type KioskScreen = "idle" | "manual" | "result";
 
-export function KioskView({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: PublicVisit }) {
+export function KioskView({ kiosk, demoVisit }: { kiosk: KioskInfo; demoVisit: PublicVisit }) {
   // No patient is known yet on the idle screen, so this starts on the
   // hospital's default language. Once a real scan resolves a Visit, seed
   // this from Visit.patient.preferred_language instead.
@@ -27,7 +29,7 @@ export function KioskView({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit:
   );
 }
 
-function KioskBody({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: PublicVisit }) {
+function KioskBody({ kiosk, demoVisit }: { kiosk: KioskInfo; demoVisit: PublicVisit }) {
   const [screen, setScreen] = useState<KioskScreen>("idle");
   const [activeVisit, setActiveVisit] = useState<PublicVisit | null>(null);
 
@@ -53,7 +55,7 @@ function KioskBody({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: Public
           />
         )}
         {screen === "manual" && <ManualEntryScreen onFound={showResult} onBack={() => setScreen("idle")} />}
-        {screen === "result" && activeVisit && <ResultScreen visit={activeVisit} onReset={reset} />}
+        {screen === "result" && activeVisit && <ResultScreen kiosk={kiosk} visit={activeVisit} onReset={reset} />}
       </div>
     </div>
   );
@@ -65,7 +67,7 @@ function IdleScreen({
   onScanResolved,
   onEnterManually,
 }: {
-  kiosk: KioskDevice;
+  kiosk: KioskInfo;
   onScan: () => void;
   onScanResolved: (visit: PublicVisit) => void;
   onEnterManually: () => void;
@@ -79,7 +81,7 @@ function IdleScreen({
           <div className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-[var(--brand-ink-soft)]">
             <MapPinIcon width={14} height={14} stroke="#eaf3f1" strokeWidth={2} />
           </div>
-          <div className="text-[12.5px] font-bold text-[#eaf3f1]">{t("deviceLabel", { code: kiosk.deviceCode })}</div>
+          <div className="text-[12.5px] font-bold text-[#eaf3f1]">{t("deviceLabel", { code: kiosk.device_code })}</div>
         </div>
         <LanguageToggle variant="dark" />
       </div>
@@ -391,10 +393,17 @@ function ManualEntryScreen({ onFound, onBack }: { onFound: (visit: PublicVisit) 
   );
 }
 
-function ResultScreen({ visit, onReset }: { visit: PublicVisit; onReset: () => void }) {
+function ResultScreen({ kiosk, visit, onReset }: { kiosk: KioskInfo; visit: PublicVisit; onReset: () => void }) {
   const tPatient = useTranslations("patient");
   const tKiosk = useTranslations("kiosk");
   const locale = useLocale() as AppLocale;
+
+  // Phase 7: straight-line bearing from this kiosk node to the patient's
+  // next service point. `computeDirection` returns null-equivalent fields
+  // (distance_m=null, etc.) when something's off, so DirectionBlock can
+  // always render something meaningful — including a "different floor"
+  // banner when the destination lives on another floor plan image.
+  const direction = visit.next_step ? computeDirection(kiosk, visit.next_step.service_point) : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -410,6 +419,9 @@ function ResultScreen({ visit, onReset }: { visit: PublicVisit; onReset: () => v
       </div>
 
       <div className="flex flex-1 flex-col gap-3.5 overflow-auto bg-[var(--surface-app)] p-[18px]">
+        {visit.next_step && direction && (
+          <DirectionBlock direction={direction} destination={visit.next_step.service_point} locale={locale} scale="kiosk" />
+        )}
         {visit.next_step && (
           <>
             <NextStepCard nextStep={visit.next_step} scale="kiosk" />

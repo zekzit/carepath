@@ -18,6 +18,16 @@ export type PublicVisitServicePoint = {
   name_en: string;
   department_th: string; // may be "" — prefer over name_* when non-empty
   department_en: string;
+  // Phase 7 (Kiosk compass guidance): the node's floor-plan coordinates +
+  // the floor's calibrated scale. Combined with the kiosk node's own
+  // position (from GET /api/facility/kiosks/{device_code}), the frontend
+  // computes straight-line bearing + distance to guide the patient.
+  pos_x: number;
+  pos_y: number;
+  floor_id: number;
+  floor_scale_m_per_px: number | null;
+  floor_name_th: string;
+  floor_name_en: string;
 };
 
 export type PublicVisitStep = {

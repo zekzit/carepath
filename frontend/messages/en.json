@@ -315,6 +315,8 @@
     "printQrDocTitle": "Patient QR Code",
     "printQrLinkLabel": "Patient link",
     "printQrPopupBlocked": "The browser blocked the print window. Please allow pop-ups and try again.",
+    "openPatientLink": "Open patient link",
+    "openPatientLinkTitle": "Open this visit's Patient Portal in a new tab",
     "visitStepsEmpty": "This pathway template has no steps",
     "adHocStep": "Added ad-hoc",
     "stepActionStart": "Start",
@@ -374,6 +376,30 @@
     "cameraResolving": "Checking your appointment...",
     "cameraNotFound": "No appointment found for this QR code. Scanning again...",
     "cameraUnavailableTitle": "Camera unavailable",
-    "cameraUnavailableBody": "Please tap the button below to enter your HN instead."
+    "cameraUnavailableBody": "Please tap the button below to enter your HN instead.",
+    "listTitle": "Select a kiosk",
+    "listSubtitle": "Pick a kiosk in the system to open its navigation screen.",
+    "listSearchPlaceholder": "Search by name or device code",
+    "listDeviceCodeLabel": "Device code",
+    "listEmptyAdmin": "No kiosks registered yet.",
+    "listEmptySearch": "No kiosks match your search.",
+    "direction": {
+      "title": "Direction from kiosk",
+      "floorChange": "Go to {floor}",
+      "arrived": "You've arrived at the destination",
+      "distanceMeters": "~{value} m",
+      "distanceUnknown": "Distance unknown (floor scale not calibrated)",
+      "ariaCompass": "Compass pointing {cardinal}, approximately {bearing} degrees",
+      "cardinalLong": {
+        "0": "north",
+        "1": "northeast",
+        "2": "east",
+        "3": "southeast",
+        "4": "south",
+        "5": "southwest",
+        "6": "west",
+        "7": "northwest"
+      }
+    }
   }
 }

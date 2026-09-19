@@ -17,6 +17,16 @@ _service_point_payload = inline_serializer(
         "name_en": serializers.CharField(),
         "department_th": serializers.CharField(),
         "department_en": serializers.CharField(),
+        # Phase 7 (Kiosk compass guidance): expose the node's floor-plan
+        # coordinates so the frontend can compute straight-line bearing
+        # + distance from the kiosk node to this service point. The kiosk's
+        # own position comes from GET /api/facility/kiosks/{device_code}.
+        "pos_x": serializers.FloatField(),
+        "pos_y": serializers.FloatField(),
+        "floor_id": serializers.IntegerField(),
+        "floor_scale_m_per_px": serializers.FloatField(allow_null=True),
+        "floor_name_th": serializers.CharField(),
+        "floor_name_en": serializers.CharField(),
     },
 )
 _visit_step_payload = inline_serializer(
@@ -75,10 +85,12 @@ def serialize_public_visit(visit: Visit) -> dict:
     single model's fields.
     """
     steps = list(
-        visit.steps.select_related("service_point").prefetch_related("prerequisite_steps").order_by("sequence_order")
+        visit.steps.select_related("service_point__floor").prefetch_related("prerequisite_steps").order_by("sequence_order")
     )
 
     def step_payload(step: VisitStep) -> dict:
+        sp = step.service_point
+        floor = sp.floor
         return {
             "id": step.id,
             "sequence_order": step.sequence_order,
@@ -87,11 +99,17 @@ def serialize_public_visit(visit: Visit) -> dict:
             "started_at": step.started_at,
             "completed_at": step.completed_at,
             "service_point": {
-                "id": step.service_point.id,
-                "name_th": step.service_point.name_th,
-                "name_en": step.service_point.name_en,
-                "department_th": step.service_point.department_th,
-                "department_en": step.service_point.department_en,
+                "id": sp.id,
+                "name_th": sp.name_th,
+                "name_en": sp.name_en,
+                "department_th": sp.department_th,
+                "department_en": sp.department_en,
+                "pos_x": sp.pos_x,
+                "pos_y": sp.pos_y,
+                "floor_id": floor.id,
+                "floor_scale_m_per_px": floor.plan_scale_m_per_px,
+                "floor_name_th": floor.name_th,
+                "floor_name_en": floor.name_en,
             },
         }
 
