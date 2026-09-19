@@ -133,28 +133,27 @@ const DEMO_VISIT: PublicVisit = {
       },
     },
   ],
-  next_step: {
-    id: 3,
-    sequence_order: 3,
-    status: "IN_PROGRESS",
-    prerequisite_steps: [2],
-    started_at: "2026-09-19T02:15:00Z",
-    completed_at: null,
-    service_point: {
+  next_steps: [
+    {
       id: 3,
-      name_th: "จุดเจาะเลือด",
-      name_en: "Blood draw point",
-      department_th: "ห้องแล็บ",
-      department_en: "Laboratory",
-      pos_x: 600,
-      pos_y: 520,
-      floor_id: 1,
-      floor_scale_m_per_px: 0.05,
-      floor_name_th: "ชั้น 1 อาคารผู้ป่วยนอก",
-      floor_name_en: "Floor 1 · OPD",
+      sequence_order: 3,
+      status: "IN_PROGRESS",
+      service_point: {
+        id: 3,
+        name_th: "จุดเจาะเลือด",
+        name_en: "Blood draw point",
+        department_th: "ห้องแล็บ",
+        department_en: "Laboratory",
+        pos_x: 600,
+        pos_y: 520,
+        floor_id: 1,
+        floor_scale_m_per_px: 0.05,
+        floor_name_th: "ชั้น 1 อาคารผู้ป่วยนอก",
+        floor_name_en: "Floor 1 · OPD",
+      },
+      queue_ticket: { ticket_number: 24, status: "WAITING", current_number: 19 },
     },
-  },
-  queue_ticket: { ticket_number: 24, status: "WAITING", current_number: 19 },
+  ],
 };
 
 // Synthesized kiosk position for the demo path — same floor and scale as

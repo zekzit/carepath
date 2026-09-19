@@ -1,18 +1,14 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import type { KioskInfo } from "@/lib/api/facility";
-import type { AppLocale } from "@/i18n/locales";
 import type { PublicVisit } from "@/lib/api/public-visit";
-import { fetchVisitByHnTodayClient, fetchVisitByTokenClient, serviceStepLocationName } from "@/lib/api/public-visit";
-import { computeDirection } from "@/lib/direction";
+import { fetchVisitByHnTodayClient, fetchVisitByTokenClient } from "@/lib/api/public-visit";
 import { CameraScanner, type CameraScannerMessages } from "./CameraScanner";
 import { PortalLocaleProvider } from "./locale-context";
 import { LanguageToggle } from "./LanguageToggle";
-import { NextStepCard } from "./NextStepCard";
-import { DirectionBlock } from "./DirectionBlock";
-import { QueueWidget } from "./QueueWidget";
+import { NextStepOptionsList } from "./NextStepOptionsList";
 import { KeyboardIcon, MapPinIcon, RefreshIcon } from "@/components/icons";
 
 type KioskScreen = "idle" | "manual" | "result";
@@ -188,14 +184,6 @@ function ManualEntryScreen({ onFound, onBack }: { onFound: (visit: PublicVisit) 
 function ResultScreen({ kiosk, visit, onReset }: { kiosk: KioskInfo; visit: PublicVisit; onReset: () => void }) {
   const tPatient = useTranslations("patient");
   const tKiosk = useTranslations("kiosk");
-  const locale = useLocale() as AppLocale;
-
-  // Phase 7: straight-line bearing from this kiosk node to the patient's
-  // next service point. `computeDirection` returns null-equivalent fields
-  // (distance_m=null, etc.) when something's off, so DirectionBlock can
-  // always render something meaningful — including a "different floor"
-  // banner when the destination lives on another floor plan image.
-  const direction = visit.next_step ? computeDirection(kiosk, visit.next_step.service_point) : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -211,14 +199,8 @@ function ResultScreen({ kiosk, visit, onReset }: { kiosk: KioskInfo; visit: Publ
       </div>
 
       <div className="flex flex-1 flex-col gap-3.5 overflow-auto bg-[var(--surface-app)] p-[18px]">
-        {visit.next_step && direction && (
-          <DirectionBlock direction={direction} destination={visit.next_step.service_point} locale={locale} scale="kiosk" />
-        )}
-        {visit.next_step && (
-          <>
-            <NextStepCard nextStep={visit.next_step} scale="kiosk" />
-            <QueueWidget ticket={visit.queue_ticket} locationName={serviceStepLocationName(visit.next_step, locale)} scale="kiosk" />
-          </>
+        {visit.next_steps.length > 0 && (
+          <NextStepOptionsList options={visit.next_steps} origin={kiosk} variant="kiosk" />
         )}
 
         <div className="flex-1" />

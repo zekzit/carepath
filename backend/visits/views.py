@@ -57,6 +57,22 @@ _patient_payload = inline_serializer(
         "preferred_language": serializers.CharField(),
     },
 )
+# An eligible next step with its (optional) per-step queue ticket inlined.
+# Multiple of these can coexist when VisitSteps share a sequence_order
+# (fan-out): the patient picks one to go to first, the rest stay PENDING
+# until this one is DONE/SKIPPED. The full ordered step list still lives
+# under `steps`, and the timeline group rule (all DONE/SKIPPED in the
+# group before the next group unlocks) is unchanged.
+_next_step_option_payload = inline_serializer(
+    name="PublicVisitNextStepOption",
+    fields={
+        "id": serializers.IntegerField(),
+        "sequence_order": serializers.IntegerField(),
+        "status": serializers.CharField(),
+        "service_point": _service_point_payload,
+        "queue_ticket": _queue_ticket_payload,
+    },
+)
 public_visit_response = inline_serializer(
     name="PublicVisitResponse",
     fields={
@@ -66,8 +82,7 @@ public_visit_response = inline_serializer(
         "uses_wheelchair": serializers.BooleanField(),
         "patient": _patient_payload,
         "steps": serializers.ListField(child=_visit_step_payload),
-        "next_step": _visit_step_payload,
-        "queue_ticket": _queue_ticket_payload,
+        "next_steps": serializers.ListField(child=_next_step_option_payload),
     },
 )
 _not_found_response = inline_serializer(
@@ -85,7 +100,9 @@ def serialize_public_visit(visit: Visit) -> dict:
     single model's fields.
     """
     steps = list(
-        visit.steps.select_related("service_point__floor").prefetch_related("prerequisite_steps").order_by("sequence_order")
+        visit.steps.select_related("service_point__floor")
+        .prefetch_related("prerequisite_steps", "queue_ticket__queue")
+        .order_by("sequence_order")
     )
 
     def step_payload(step: VisitStep) -> dict:
@@ -117,28 +134,41 @@ def serialize_public_visit(visit: Visit) -> dict:
     # every prerequisite must be DONE — a SKIPPED one does not count), just
     # computed in bulk here from an already-fetched list instead of a
     # per-step DB query, since we're composing the whole visit at once.
+    #
+    # Returned as a list (next_steps) instead of a single step so the
+    # Patient/Kiosk portals can show the full fan-out: steps that share a
+    # `sequence_order` are parallel — the patient picks one to start, the
+    # rest stay PENDING. If no step is IN_PROGRESS yet, every parallel
+    # option comes back as PENDING with its own (possibly null) queue
+    # ticket, so the portal can render each as an independent card.
     done_ids = {s.id for s in steps if s.status == VisitStep.Status.DONE}
-    next_step = next((s for s in steps if s.status == VisitStep.Status.IN_PROGRESS), None)
-    if next_step is None:
-        next_step = next(
-            (
-                s
-                for s in steps
-                if s.status == VisitStep.Status.PENDING
-                and {p.id for p in s.prerequisite_steps.all()}.issubset(done_ids)
-            ),
-            None,
-        )
+    in_progress = [s for s in steps if s.status == VisitStep.Status.IN_PROGRESS]
+    if in_progress:
+        eligible = in_progress
+    else:
+        eligible = [
+            s
+            for s in steps
+            if s.status == VisitStep.Status.PENDING
+            and {p.id for p in s.prerequisite_steps.all()}.issubset(done_ids)
+        ]
 
-    queue_ticket_payload = None
-    if next_step is not None:
-        ticket = getattr(next_step, "queue_ticket", None)
+    def next_step_payload(step: VisitStep) -> dict:
+        ticket = getattr(step, "queue_ticket", None)
+        ticket_payload = None
         if ticket is not None:
-            queue_ticket_payload = {
+            ticket_payload = {
                 "ticket_number": ticket.ticket_number,
                 "status": ticket.status,
                 "current_number": ticket.queue.current_number,
             }
+        return {
+            "id": step.id,
+            "sequence_order": step.sequence_order,
+            "status": step.status,
+            "service_point": step_payload(step)["service_point"],
+            "queue_ticket": ticket_payload,
+        }
 
     return {
         "qr_token": visit.qr_token,
@@ -151,8 +181,7 @@ def serialize_public_visit(visit: Visit) -> dict:
             "preferred_language": visit.patient.preferred_language,
         },
         "steps": [step_payload(s) for s in steps],
-        "next_step": step_payload(next_step) if next_step else None,
-        "queue_ticket": queue_ticket_payload,
+        "next_steps": [next_step_payload(s) for s in eligible],
     }
 
 

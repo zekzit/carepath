@@ -6,16 +6,13 @@ import type { AppLocale } from "@/i18n/locales";
 import type { LocationNodeInfo } from "@/lib/api/facility";
 import { fetchLocationNodeByQrClient } from "@/lib/api/facility";
 import type { PublicVisit } from "@/lib/api/public-visit";
-import { fetchVisitByTokenClient, serviceStepLocationName } from "@/lib/api/public-visit";
-import { computeDirection } from "@/lib/direction";
+import { fetchVisitByTokenClient } from "@/lib/api/public-visit";
 import { CheckCircleIcon, KeyboardIcon, MapPinIcon, QrScanIcon, RefreshIcon, XIcon } from "@/components/icons";
 import { CameraScanner, type CameraScannerMessages } from "./CameraScanner";
-import { DirectionBlock } from "./DirectionBlock";
 import { PortalLocaleProvider } from "./locale-context";
 import { PortalHeader } from "./PortalHeader";
 import { StepTimeline } from "./StepTimeline";
-import { NextStepCard } from "./NextStepCard";
-import { QueueWidget } from "./QueueWidget";
+import { NextStepOptionsList } from "./NextStepOptionsList";
 
 // S6 (MODELS.md § 4): no push notifications in this MVP — the frontend polls
 // the public by-token endpoint instead, since `ticket_number - current_number`
@@ -32,7 +29,6 @@ export function PatientPortalView({ token, initialVisit }: { token: string; init
 
 function PatientPortalBody({ token, initialVisit }: { token: string; initialVisit: PublicVisit }) {
   const t = useTranslations("patient");
-  const locale = useLocale() as AppLocale;
   const [visit, setVisit] = useState(initialVisit);
 
   // Phase 8: "where am I" state. In-memory only (per IMPLEMENT_PLAN
@@ -52,10 +48,6 @@ function PatientPortalBody({ token, initialVisit }: { token: string; initialVisi
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [token]);
-
-  const direction = currentLocation && visit.next_step
-    ? computeDirection(currentLocation, visit.next_step.service_point)
-    : null;
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-[var(--surface-app)]">
@@ -82,20 +74,8 @@ function PatientPortalBody({ token, initialVisit }: { token: string; initialVisi
           <StepTimeline steps={visit.steps} />
         </div>
 
-        {visit.next_step ? (
-          <>
-            {direction && (
-              <DirectionBlock
-                direction={direction}
-                destination={visit.next_step.service_point}
-                locale={locale}
-                scale="default"
-                title={t("directionTitle")}
-              />
-            )}
-            <NextStepCard nextStep={visit.next_step} />
-            <QueueWidget ticket={visit.queue_ticket} locationName={serviceStepLocationName(visit.next_step, locale)} />
-          </>
+        {visit.next_steps.length > 0 ? (
+          <NextStepOptionsList options={visit.next_steps} origin={currentLocation} variant="patient" />
         ) : (
           <VisitCompleteCard />
         )}

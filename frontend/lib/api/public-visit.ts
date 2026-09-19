@@ -48,6 +48,20 @@ export type PublicVisitQueueTicket = {
   current_number: number; // Queue.current_number — "remaining" = ticket_number - current_number (MODELS.md § 4 / S6)
 };
 
+export type PublicVisitNextStepOption = {
+  id: number;
+  sequence_order: number;
+  status: PublicVisitStepStatus;
+  service_point: PublicVisitServicePoint;
+  /**
+   * Mirrors the old top-level `queue_ticket` semantics:
+   *  - null — the step is eligible to start but no staff has started it
+   *    at the Admin Portal yet, so no ticket exists.
+   *  - set  — full "walk there and watch the queue" flow.
+   */
+  queue_ticket: PublicVisitQueueTicket | null;
+};
+
 export type PublicVisit = {
   qr_token: string;
   status: "REGISTERED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
@@ -61,14 +75,16 @@ export type PublicVisit = {
   /** Ordered by sequence_order; steps sharing a sequence_order run in parallel. */
   steps: PublicVisitStep[];
   /**
-   * Three real states (see IMPLEMENT_PLAN.md Phase 3):
-   *  1. null — every step is DONE/SKIPPED, nothing left to do.
-   *  2. set, queue_ticket null — eligible to start, but no staff has started
-   *     it yet at the Admin Portal, so no ticket exists.
-   *  3. set, queue_ticket set — the full "walk there and watch the queue" flow.
+   * All eligible parallel options the patient can act on next. Empty when
+   * every step is DONE/SKIPPED. Length is typically 1 (single next step)
+   * but can be N for fan-out groups (same sequence_order) — the patient
+   * picks one and the rest stay PENDING until this one resolves.
+   *
+   * Each option embeds its own `queue_ticket` (per-step): a parallel
+   * option may have started and received a ticket already, while a
+   * sibling still has queue_ticket=null.
    */
-  next_step: PublicVisitStep | null;
-  queue_ticket: PublicVisitQueueTicket | null;
+  next_steps: PublicVisitNextStepOption[];
 };
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
@@ -120,8 +136,13 @@ export async function fetchVisitByHnTodayClient(hnCode: string): Promise<PublicV
 }
 
 /** department_th/en is the clinical department name (e.g. "ห้องแล็บ") and is
- * preferred whenever non-empty; otherwise falls back to the node's own name. */
-export function serviceStepLocationName(step: PublicVisitStep, locale: AppLocale): string {
+ * preferred whenever non-empty; otherwise falls back to the node's own name.
+ * Accepts any object that exposes a `service_point` (full PublicVisitStep
+ * or the lighter PublicVisitNextStepOption used by next_steps). */
+export function serviceStepLocationName(
+  step: { service_point: PublicVisitServicePoint },
+  locale: AppLocale,
+): string {
   const sp = step.service_point;
   const department = locale === "th" ? sp.department_th : sp.department_en;
   if (department) return department;

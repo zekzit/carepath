@@ -355,6 +355,8 @@
     "parallelNote": "Can be done in parallel · go to either one first",
     "waitingPrereq": "Waiting on the previous step",
     "nextStepTitle": "Your next step",
+  "nextStepsTitle": "You have {count} options",
+  "nextStepSubtitle": "Pick where to go first — the others stay open for afterwards",
     "navigateCta": "Navigate here",
     "queueTitleAt": "Your queue at {location}",
     "queueCalling": "Now serving",

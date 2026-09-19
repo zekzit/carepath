@@ -1,6 +1,6 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { AppLocale } from "@/i18n/locales";
-import type { PublicVisitStep } from "@/lib/api/public-visit";
+import type { PublicVisitServicePoint } from "@/lib/api/public-visit";
 import { serviceStepLocationName } from "@/lib/api/public-visit";
 import { MapPinIcon, NavigateIcon } from "@/components/icons";
 
@@ -12,7 +12,18 @@ type Scale = "default" | "kiosk";
 // with DirectionBlock (Phase 7), which renders a straight-line bearing +
 // distance from the kiosk node using the service_point's newly-exposed
 // pos_x/pos_y and floor_scale_m_per_px.
-export function NextStepCard({ nextStep, scale = "default" }: { nextStep: PublicVisitStep; scale?: Scale }) {
+//
+// Accepts any object exposing a `service_point` so it works for both the
+// full VisitStep timeline (which still includes prerequisite_steps etc.)
+// and the lighter PublicVisitNextStepOption used by the parallel fan-out
+// "next_steps" list.
+export function NextStepCard({
+  nextStep,
+  scale = "default",
+}: {
+  nextStep: { service_point: PublicVisitServicePoint };
+  scale?: Scale;
+}) {
   const t = useTranslations("patient");
   const locale = useLocale() as AppLocale;
   const isKiosk = scale === "kiosk";

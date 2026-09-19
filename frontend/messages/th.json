@@ -355,6 +355,8 @@
     "parallelNote": "ทำคู่ขนานกันได้ · เลือกไปจุดไหนก่อนก็ได้",
     "waitingPrereq": "รอขั้นตอนก่อนหน้าเสร็จ",
     "nextStepTitle": "ขั้นตอนถัดไปของคุณ",
+  "nextStepsTitle": "คุณมี {count} ทางเลือก",
+  "nextStepSubtitle": "เลือกจุดที่จะไปก่อน — ทางอื่นยังเปิดให้ทำภายหลัง",
     "navigateCta": "นำทางไปจุดนี้",
     "queueTitleAt": "คิวของคุณที่{location}",
     "queueCalling": "กำลังเรียกคิว",
