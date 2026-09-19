@@ -4,6 +4,8 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from accounts.models import StaffUser
+from accounts.permissions import RoleRequired
 from accounts.services import log_action
 from queues.services import ensure_ticket_for_step
 
@@ -26,6 +28,9 @@ from .serializers import PatientSerializer, VisitSerializer, VisitStepSerializer
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all().order_by("full_name")
     serializer_class = PatientSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.REGISTRAR,)
+    write_roles = (StaffUser.Role.REGISTRAR,)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -58,6 +63,9 @@ class PatientViewSet(viewsets.ModelViewSet):
 class VisitViewSet(viewsets.ModelViewSet):
     queryset = Visit.objects.select_related("patient", "pathway_template").order_by("-created_at")
     serializer_class = VisitSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.REGISTRAR, StaffUser.Role.EXECUTIVE)
+    write_roles = (StaffUser.Role.REGISTRAR,)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -108,6 +116,9 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = VisitStep.objects.select_related("visit", "service_point").prefetch_related("prerequisite_steps")
     serializer_class = VisitStepSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.SERVICE_STAFF,)
+    write_roles = (StaffUser.Role.SERVICE_STAFF,)
 
     def get_queryset(self):
         qs = super().get_queryset()

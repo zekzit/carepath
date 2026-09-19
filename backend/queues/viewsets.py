@@ -5,6 +5,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from accounts.models import StaffUser
+from accounts.permissions import RoleRequired
+
 from .models import Queue, QueueTicket, ServiceSchedule
 from .serializers import QueueSerializer, QueueTicketSerializer, ServiceScheduleSerializer
 
@@ -28,6 +31,9 @@ class ServiceScheduleViewSet(ModelViewSet):
 
     queryset = ServiceSchedule.objects.select_related("service_point").order_by("service_point_id", "day_of_week")
     serializer_class = ServiceScheduleSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -56,6 +62,9 @@ class QueueViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = Queue.objects.select_related("service_point").order_by("-queue_date")
     serializer_class = QueueSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.SERVICE_STAFF, StaffUser.Role.EXECUTIVE)
+    write_roles = (StaffUser.Role.SERVICE_STAFF,)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -115,6 +124,9 @@ class QueueViewSet(viewsets.ReadOnlyModelViewSet):
 class QueueTicketViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = QueueTicket.objects.select_related("queue", "visit_step__visit__patient")
     serializer_class = QueueTicketSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.SERVICE_STAFF,)
+    write_roles = (StaffUser.Role.SERVICE_STAFF,)
 
     def get_queryset(self):
         qs = super().get_queryset()

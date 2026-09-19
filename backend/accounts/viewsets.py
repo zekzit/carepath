@@ -3,6 +3,7 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
 from . import services
 from .models import AuditLog, ServicePointStaff, StaffUser
+from .permissions import RoleRequired
 from .serializers import AuditLogSerializer, ServicePointStaffSerializer, StaffUserAdminSerializer
 
 
@@ -17,6 +18,9 @@ from .serializers import AuditLogSerializer, ServicePointStaffSerializer, StaffU
 class StaffUserViewSet(ModelViewSet):
     queryset = StaffUser.objects.all().order_by("username")
     serializer_class = StaffUserAdminSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -49,6 +53,9 @@ class StaffUserViewSet(ModelViewSet):
 class ServicePointStaffViewSet(ModelViewSet):
     queryset = ServicePointStaff.objects.select_related("staff_user", "service_point").all()
     serializer_class = ServicePointStaffSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -61,6 +68,8 @@ class ServicePointStaffViewSet(ModelViewSet):
 class AuditLogViewSet(ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("staff_user").order_by("-created_at")
     serializer_class = AuditLogSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.EXECUTIVE,)
 
     def get_queryset(self):
         qs = super().get_queryset()

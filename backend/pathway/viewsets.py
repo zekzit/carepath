@@ -1,6 +1,9 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.viewsets import ModelViewSet
 
+from accounts.models import StaffUser
+from accounts.permissions import RoleRequired
+
 from .models import CareCategory, PathwayTemplate, TemplateStep
 from .serializers import CareCategorySerializer, PathwayTemplateSerializer, TemplateStepSerializer
 
@@ -16,6 +19,9 @@ from .serializers import CareCategorySerializer, PathwayTemplateSerializer, Temp
 class CareCategoryViewSet(ModelViewSet):
     queryset = CareCategory.objects.all().order_by("name_en")
     serializer_class = CareCategorySerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.REGISTRAR,)
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -37,6 +43,9 @@ class CareCategoryViewSet(ModelViewSet):
 class PathwayTemplateViewSet(ModelViewSet):
     queryset = PathwayTemplate.objects.select_related("care_category").order_by("name_en")
     serializer_class = PathwayTemplateSerializer
+    permission_classes = [RoleRequired]
+    read_roles = (StaffUser.Role.REGISTRAR,)
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -60,3 +69,6 @@ class TemplateStepViewSet(ModelViewSet):
         .all()
     )
     serializer_class = TemplateStepSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()

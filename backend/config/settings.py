@@ -55,13 +55,17 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = 'accounts.StaffUser'
 
-# No per-role enforcement yet (see IMPLEMENT_PLAN.md Phase 0 decision log) —
-# accounts/views.py wires up real session login so the Admin Portal knows
-# the signed-in StaffUser's actual role, but every endpoint stays AllowAny
-# until a future phase adds role-based permission classes.
+# Per-role enforcement is now wired up (see accounts/permissions.py's
+# RoleRequired) — accounts/views.py's session login gives the Admin Portal
+# the signed-in StaffUser's actual role, and every ViewSet declares
+# read_roles/write_roles checked by RoleRequired. The default below is a
+# fail-safe backstop: any endpoint that forgets an explicit permission_classes
+# still requires login rather than staying wide open. Only the documented
+# public endpoints (login, logout, me, health, kiosk lookup, visit-by-token,
+# visit-by-hn-today, location-node-by-qr) carry an explicit AllowAny.
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -73,8 +77,10 @@ SPECTACULAR_SETTINGS = {
         "Admin Portal (master data, queue console, reports), the Patient "
         "Portal (tokenless visit tracking via a per-visit `qr_token`), and "
         "the Kiosk Portal (Phase 4).\n\n"
-        "All endpoints are currently `AllowAny` — real session login is wired "
-        "but role-based permission classes land in a later phase."
+        "Endpoints are role-gated via session login (see `RoleRequired` in "
+        "`accounts/permissions.py`) — only the documented public endpoints "
+        "(login, logout, me, health, kiosk lookup, visit-by-token, "
+        "visit-by-hn-today, location-node-by-qr) stay `AllowAny`."
     ),
     'VERSION': '0.1.0',
     'SERVE_INCLUDE_SCHEMA': False,

@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.viewsets import ModelViewSet
 
+from accounts.permissions import RoleRequired
+
 from .models import Building, Edge, Floor, Node
 from .serializers import BuildingSerializer, EdgeSerializer, FloorSerializer, NodeSerializer
 
@@ -16,6 +18,9 @@ from .serializers import BuildingSerializer, EdgeSerializer, FloorSerializer, No
 class BuildingViewSet(ModelViewSet):
     queryset = Building.objects.all().order_by("code")
     serializer_class = BuildingSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -29,6 +34,9 @@ class BuildingViewSet(ModelViewSet):
 class FloorViewSet(ModelViewSet):
     queryset = Floor.objects.select_related("building").order_by("building__code", "level_no")
     serializer_class = FloorSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -49,6 +57,9 @@ class FloorViewSet(ModelViewSet):
 class NodeViewSet(ModelViewSet):
     queryset = Node.objects.select_related("floor").order_by("floor_id", "name_en")
     serializer_class = NodeSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
 
 
 @extend_schema_view(
@@ -71,3 +82,6 @@ class NodeViewSet(ModelViewSet):
 class EdgeViewSet(ModelViewSet):
     queryset = Edge.objects.select_related("from_node", "to_node").all()
     serializer_class = EdgeSerializer
+    permission_classes = [RoleRequired]
+    read_roles = ()
+    write_roles = ()
