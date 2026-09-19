@@ -311,6 +311,12 @@
     "manualEntrySubmit": "Search",
     "manualEntrySearching": "Searching...",
     "manualEntryBack": "Back",
-    "manualEntryNotFound": "No appointment found for this HN today. Please double-check or ask staff for help."
+    "manualEntryNotFound": "No appointment found for this HN today. Please double-check or ask staff for help.",
+    "cameraRequesting": "Requesting camera access...",
+    "cameraScanningHint": "Hold the QR code inside the frame",
+    "cameraResolving": "Checking your appointment...",
+    "cameraNotFound": "No appointment found for this QR code. Scanning again...",
+    "cameraUnavailableTitle": "Camera unavailable",
+    "cameraUnavailableBody": "Please tap the button below to enter your HN instead."
   }
 }

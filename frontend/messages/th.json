@@ -311,6 +311,12 @@
     "manualEntrySubmit": "ค้นหา",
     "manualEntrySearching": "กำลังค้นหา...",
     "manualEntryBack": "กลับ",
-    "manualEntryNotFound": "ไม่พบข้อมูลนัดหมายวันนี้สำหรับหมายเลขนี้ กรุณาตรวจสอบอีกครั้งหรือติดต่อเจ้าหน้าที่"
+    "manualEntryNotFound": "ไม่พบข้อมูลนัดหมายวันนี้สำหรับหมายเลขนี้ กรุณาตรวจสอบอีกครั้งหรือติดต่อเจ้าหน้าที่",
+    "cameraRequesting": "กำลังขอสิทธิ์ใช้กล้อง...",
+    "cameraScanningHint": "จ่อ QR Code ให้อยู่ในกรอบ",
+    "cameraResolving": "กำลังตรวจสอบข้อมูล...",
+    "cameraNotFound": "ไม่พบข้อมูลนัดหมายสำหรับ QR นี้ กำลังสแกนใหม่อีกครั้ง...",
+    "cameraUnavailableTitle": "ใช้กล้องไม่ได้",
+    "cameraUnavailableBody": "กรุณาแตะปุ่มด้านล่างเพื่อกรอกเลข HN แทน"
   }
 }

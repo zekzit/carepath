@@ -271,6 +271,17 @@ export function RulerIcon(props: IconProps) {
   );
 }
 
+export function CameraOffIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <line x1="1" y1="1" x2="23" y2="23" />
+      <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l1.5-2h5l1 1.3" />
+      <path d="M17.5 6H21a2 2 0 0 1 2 2v9.34" />
+      <circle cx="12" cy="13" r="3.5" />
+    </Icon>
+  );
+}
+
 export function XIcon(props: IconProps) {
   return (
     <Icon {...props}>
