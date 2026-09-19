@@ -6,7 +6,7 @@ export function PortalHeader({ subtitle }: { subtitle?: string }) {
   const t = useTranslations("common");
 
   return (
-    <div className="flex shrink-0 items-center justify-between bg-[var(--brand-ink)] px-[18px] py-4">
+    <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between bg-[var(--brand-ink)] px-[18px] py-4">
       <div className="flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--brand-ink-soft)]">
           <MapPinIcon width={15} height={15} stroke="#eaf3f1" strokeWidth={2} />

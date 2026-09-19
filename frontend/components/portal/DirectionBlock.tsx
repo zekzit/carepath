@@ -20,6 +20,13 @@ type DirectionBlockProps = {
   destination: NodePosition;
   locale: AppLocale;
   scale?: "default" | "kiosk";
+  /**
+   * Optional override for the section title. Defaults to the kiosk copy
+   * ("Direction from kiosk") — Phase 8's Patient Portal passes a
+   * patient-specific title ("Direction from where you stand") instead,
+   * since the origin is the patient's scanned junction, not a kiosk.
+   */
+  title?: string;
 };
 
 const SIZE = 168;
@@ -46,11 +53,12 @@ function polar(angleDeg: number, radius: number) {
   return { x: CENTER + radius * Math.sin(a), y: CENTER - radius * Math.cos(a) };
 }
 
-export function DirectionBlock({ direction, destination, locale, scale = "kiosk" }: DirectionBlockProps) {
+export function DirectionBlock({ direction, destination, locale, scale = "kiosk", title }: DirectionBlockProps) {
   const t = useTranslations("kiosk.direction");
   const isKiosk = scale === "kiosk";
   const longNames = t.raw("cardinalLong") as Record<string, string>;
   const destinationFloorName = locale === "th" ? destination.floor_name_th : destination.floor_name_en;
+  const resolvedTitle = title ?? t("title");
 
   const containerPadding = isKiosk ? "p-[18px]" : "p-4";
   const containerText = isKiosk ? "text-[15px]" : "text-[14px]";
@@ -62,7 +70,7 @@ export function DirectionBlock({ direction, destination, locale, scale = "kiosk"
   if (!direction.same_floor) {
     return (
       <div className={`flex flex-col items-center gap-2 rounded-2xl bg-[var(--brand-ink)] text-white ${containerPadding}`}>
-        <div className="text-[12px] text-[#9fc4be]">{t("title")}</div>
+        <div className="text-[12px] text-[#9fc4be]">{resolvedTitle}</div>
         <div className={`font-bold ${cardinalFontSize}`}>
           {t("floorChange", { floor: destinationFloorName })}
         </div>
@@ -73,7 +81,7 @@ export function DirectionBlock({ direction, destination, locale, scale = "kiosk"
   if (direction.at_point) {
     return (
       <div className={`flex flex-col items-center gap-2 rounded-2xl bg-[var(--brand-ink)] text-white ${containerPadding}`}>
-        <div className="text-[12px] text-[#9fc4be]">{t("title")}</div>
+        <div className="text-[12px] text-[#9fc4be]">{resolvedTitle}</div>
         <div className={`font-bold ${cardinalFontSize}`}>{t("arrived")}</div>
       </div>
     );
@@ -85,7 +93,7 @@ export function DirectionBlock({ direction, destination, locale, scale = "kiosk"
 
   return (
     <div className={`flex flex-col items-center gap-2 rounded-2xl bg-[var(--brand-ink)] text-white ${containerPadding}`}>
-      <div className="self-start text-[12px] text-[#9fc4be]">{t("title")}</div>
+      <div className="self-start text-[12px] text-[#9fc4be]">{resolvedTitle}</div>
 
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
