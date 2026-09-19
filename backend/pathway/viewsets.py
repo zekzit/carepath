@@ -44,7 +44,15 @@ class PathwayTemplateViewSet(ModelViewSet):
     queryset = PathwayTemplate.objects.select_related("care_category").order_by("name_en")
     serializer_class = PathwayTemplateSerializer
     permission_classes = [RoleRequired]
-    read_roles = (StaffUser.Role.REGISTRAR,)
+    # EXECUTIVE reads template names for the Dashboard's recent-visits
+    # lookup and the Executive Reports "by pathway template" breakdown
+    # (frontend/components/admin/reports/ReportsPage.tsx) — both pages are
+    # nav-gated to EXECUTIVE (see admin-nav.ts's "dashboard"/"reports"
+    # items) but 403'd on this fetch before this widening, one of the same
+    # class of RBAC/reporting-interaction bugs as VisitStepViewSet's (see
+    # GAP.md). write_roles stays ADMIN-only — Executives still can't
+    # create/edit pathway templates.
+    read_roles = (StaffUser.Role.REGISTRAR, StaffUser.Role.EXECUTIVE)
     write_roles = ()
 
 

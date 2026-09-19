@@ -58,3 +58,19 @@ export function serveTicket(id: number): Promise<QueueTicket> {
 export function doneTicket(id: number): Promise<QueueTicket> {
   return apiFetch<QueueTicket>(`/queues/queue-tickets/${id}/done`, { method: "POST" });
 }
+
+/** Per-service-point average wait time (minutes) + DONE-step count for a
+ * given day (default: today), sorted by `avg_minutes` descending — index 0
+ * is the current bottleneck. Backed by `queues.services.service_point_wait_stats`
+ * (Executive-Reports-only; see backend/queues/views.py::wait_time_stats). */
+export type ServicePointWaitStats = {
+  service_point_id: number;
+  name_th: string;
+  name_en: string;
+  done_count: number;
+  avg_minutes: number;
+};
+
+export function fetchWaitTimeStats(date?: string): Promise<ServicePointWaitStats[]> {
+  return apiFetch<ServicePointWaitStats[]>(`/queues/stats/wait-times${date ? `?date=${date}` : ""}`);
+}

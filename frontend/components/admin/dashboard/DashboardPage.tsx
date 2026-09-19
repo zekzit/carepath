@@ -7,7 +7,15 @@ import { DashboardPlaceholderIcon } from "@/components/icons";
 import { nodesApi } from "@/lib/api/facility";
 import { listQueuesByServicePoint, listQueueTickets, type QueueTicket } from "@/lib/api/queues";
 import { pathwayTemplatesApi, type PathwayTemplate } from "@/lib/api/pathway";
-import { listVisitSteps, listVisitsByDate, patientsApi, type Patient, type Visit } from "@/lib/api/visits";
+import {
+  listVisitSteps,
+  listVisitsByDate,
+  patientsApi,
+  VISIT_STATUSES,
+  type Patient,
+  type Visit,
+} from "@/lib/api/visits";
+import type { StaffRole } from "@/lib/roles";
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -40,13 +48,20 @@ type DashboardStats = {
  * point's queue for today, and "avg. wait" averages started_at→completed_at
  * across today's DONE visit steps. Both need a per-service-point queue
  * fetch — same N-fetch approach QueueConsolePage already uses, acceptable
- * at this hospital's small service-point count. */
-async function loadDashboardData() {
+ * at this hospital's small service-point count.
+ *
+ * `includePatientIdentity` gates whether `patientsApi.list()` (REGISTRAR-only
+ * per RBAC, and always patient-identifying: full_name/hn_code) is fetched at
+ * all. An EXECUTIVE viewing this shared /admin page must never trigger that
+ * request over the network — not merely have the result hidden after the
+ * fact — so callers pass `false` for that role and this function skips the
+ * fetch entirely (see GAP.md FR-24). */
+async function loadDashboardData(includePatientIdentity: boolean) {
   const [nodes, todayVisits, allSteps, patients, pathwayTemplates] = await Promise.all([
     nodesApi.list(),
     listVisitsByDate(todayStr()),
     listVisitSteps(),
-    patientsApi.list(),
+    includePatientIdentity ? patientsApi.list() : Promise.resolve<Patient[]>([]),
     pathwayTemplatesApi.list(),
   ]);
 
@@ -89,12 +104,24 @@ async function loadDashboardData() {
   return { stats, todayVisits, patients, pathwayTemplates };
 }
 
-export function DashboardPage() {
+export function DashboardPage({ currentUserRole }: { currentUserRole?: StaffRole }) {
   const t = useTranslations("admin");
+  // Defensive default: currentUserRole is always resolved server-side in
+  // practice (app/admin/(authenticated)/layout.tsx already redirects
+  // unauthenticated visitors before this ever renders), but if it were ever
+  // missing we fall back to the pre-existing (non-Executive) behavior
+  // rather than guessing at a privacy posture.
+  const isExecutive = currentUserRole === "EXECUTIVE";
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentVisits, setRecentVisits] = useState<Visit[]>([]);
+  // Full set of today's visits (not just the top-5 `recentVisits` slice) —
+  // used only for the Executive status breakdown, which counts ALL of
+  // today's visits, not just the most recent handful. Carries no patient
+  // identity (Visit rows only reference `patient` by id).
+  const [todayVisits, setTodayVisits] = useState<Visit[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [pathwayTemplates, setPathwayTemplates] = useState<PathwayTemplate[]>([]);
 
@@ -102,10 +129,12 @@ export function DashboardPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setLoadError(false);
       try {
-        const data = await loadDashboardData();
+        const data = await loadDashboardData(!isExecutive);
         if (cancelled) return;
         setStats(data.stats);
+        setTodayVisits(data.todayVisits);
         setRecentVisits(
           data.todayVisits
             .slice()
@@ -114,6 +143,15 @@ export function DashboardPage() {
         );
         setPatients(data.patients);
         setPathwayTemplates(data.pathwayTemplates);
+      } catch {
+        // Any API error (a role/permission mismatch on some future fetch,
+        // a network hiccup, ...) surfaces as a visible empty/error state
+        // instead of leaving the page stuck silently in `loading` forever —
+        // previously there was no catch here at all, so a rejected
+        // Promise.all (e.g. an EXECUTIVE 403ing on patientsApi.list(), the
+        // exact bug this component now avoids by construction) left the
+        // page spinning indefinitely with no feedback.
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -121,7 +159,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isExecutive]);
 
   function patientLabel(patientId: number): string {
     const patient = patients.find((p) => p.id === patientId);
@@ -158,14 +196,50 @@ export function DashboardPage() {
 
       <div className="flex flex-1 flex-col rounded-[14px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-[14px] font-semibold text-[var(--ink)]">{t("dashboardRecentVisitsTitle")}</div>
-          <Link href="/admin/visits" className="text-[12px] font-medium text-[var(--brand-teal)]">
-            {t("dashboardViewAllVisits")}
-          </Link>
+          <div className="text-[14px] font-semibold text-[var(--ink)]">
+            {isExecutive ? t("dashboardVisitsByStatusTitle") : t("dashboardRecentVisitsTitle")}
+          </div>
+          {!isExecutive && (
+            <Link href="/admin/visits" className="text-[12px] font-medium text-[var(--brand-teal)]">
+              {t("dashboardViewAllVisits")}
+            </Link>
+          )}
         </div>
 
         {loading ? (
           <div className="py-10 text-center text-[12.5px] text-[var(--ink-faint)]">{t("loading")}</div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-[#8a9c99]">
+            <DashboardPlaceholderIcon width={24} height={24} strokeWidth={1.6} className="text-[#b7cbc7]" />
+            <div className="text-[12.5px]">{t("dashboardLoadError")}</div>
+          </div>
+        ) : isExecutive ? (
+          // Executives never see patient identity (full_name/hn_code) — no
+          // patient lookup even happens for this role (see
+          // loadDashboardData's includePatientIdentity flag above). This
+          // status breakdown counts ALL of today's visits (not just the
+          // top-5 `recentVisits` slice), carrying no patient-identifying
+          // information at all — Visit rows only reference `patient` by id.
+          todayVisits.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-[#8a9c99]">
+              <DashboardPlaceholderIcon width={24} height={24} strokeWidth={1.6} className="text-[#b7cbc7]" />
+              <div className="text-[12.5px]">{t("dashboardNoVisitsToday")}</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {VISIT_STATUSES.map((status) => {
+                const count = todayVisits.filter((v) => v.status === status).length;
+                return (
+                  <div key={status} className="flex items-center justify-between">
+                    <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-medium ${statusBadgeClass(status)}`}>
+                      {t(`visitStatus.${status}` as const)}
+                    </span>
+                    <span className="text-[13px] font-semibold text-[var(--ink)]">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )
         ) : recentVisits.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-[#8a9c99]">
             <DashboardPlaceholderIcon width={24} height={24} strokeWidth={1.6} className="text-[#b7cbc7]" />

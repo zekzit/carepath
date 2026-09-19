@@ -1,3 +1,6 @@
+import datetime
+
+from django.db.models import Avg, F
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -5,6 +8,9 @@ from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from accounts.models import StaffUser
+from accounts.permissions import allowed_roles
 
 from .models import Visit, VisitStep
 
@@ -239,3 +245,44 @@ def visit_by_hn_today(request, hn_code):
     if visit is None:
         return Response({"detail": "No visit found for this HN today."}, status=404)
     return Response(serialize_public_visit(visit))
+
+
+_total_time_stats_payload = inline_serializer(
+    name="TotalTimeStats",
+    fields={
+        "avg_minutes": serializers.FloatField(allow_null=True),
+        "count": serializers.IntegerField(),
+        "days": serializers.IntegerField(),
+    },
+)
+
+
+@extend_schema(
+    summary="Average total hospital time (registration → completion)",
+    description=(
+        "Executive-Reports-only (GAP.md FR-24). Averages `completed_at - "
+        "created_at` (minutes) across every COMPLETED Visit whose "
+        "`created_at` falls within the last `days` days (default 30, "
+        "clamped to 1-365). `avg_minutes` is null when `count` is 0."
+    ),
+    responses={200: _total_time_stats_payload},
+)
+@api_view(["GET"])
+@permission_classes([allowed_roles(StaffUser.Role.EXECUTIVE)])
+def total_time_stats(request):
+    days_param = request.query_params.get("days")
+    try:
+        days = int(days_param) if days_param else 30
+    except ValueError:
+        return Response({"detail": "days must be an integer."}, status=400)
+    days = max(1, min(365, days))
+
+    since = timezone.now() - datetime.timedelta(days=days)
+    qs = Visit.objects.filter(status=Visit.Status.COMPLETED, completed_at__isnull=False, created_at__gte=since)
+    count = qs.count()
+    avg_minutes = None
+    if count > 0:
+        avg_duration = qs.aggregate(avg_duration=Avg(F("completed_at") - F("created_at")))["avg_duration"]
+        if avg_duration is not None:
+            avg_minutes = round(avg_duration.total_seconds() / 60, 1)
+    return Response({"avg_minutes": avg_minutes, "count": count, "days": days})

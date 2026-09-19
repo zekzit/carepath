@@ -235,7 +235,14 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = VisitStep.objects.select_related("visit", "service_point").prefetch_related("prerequisite_steps")
     serializer_class = VisitStepSerializer
     permission_classes = [RoleRequired]
-    read_roles = (StaffUser.Role.SERVICE_STAFF,)
+    # EXECUTIVE reads step-level data for reporting (avg. steps/visit,
+    # wait-time/bottleneck aggregation on the Executive Reports page —
+    # GAP.md FR-24). Executives already have read access to Visit/Queue
+    # elsewhere in this same scheme, so this is a small, justified read-only
+    # widening, not a rollback of the RBAC work — write_roles stays
+    # SERVICE_STAFF-only, so Executives still can't start/complete/skip/
+    # insert steps.
+    read_roles = (StaffUser.Role.SERVICE_STAFF, StaffUser.Role.EXECUTIVE)
     write_roles = (StaffUser.Role.SERVICE_STAFF,)
 
     def get_queryset(self):

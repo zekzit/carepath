@@ -1,6 +1,7 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.viewsets import ModelViewSet
 
+from accounts.models import StaffUser
 from accounts.permissions import RoleRequired
 
 from .models import Building, Edge, Floor, Node
@@ -58,7 +59,20 @@ class NodeViewSet(ModelViewSet):
     queryset = Node.objects.select_related("floor").order_by("floor_id", "name_en")
     serializer_class = NodeSerializer
     permission_classes = [RoleRequired]
-    read_roles = ()
+    # Every staff role that lands on the Admin Portal Dashboard (REGISTRAR,
+    # SERVICE_STAFF, EXECUTIVE, ADMIN — see admin-nav.ts's "dashboard" nav
+    # item) needs read access to the facility node graph: DashboardPage
+    # unconditionally calls nodesApi.list() to compute "service points
+    # open" and resolve queues, and QueueConsolePage/ScheduleAdminPage/
+    # VisitDetail need it too for their own (already role-gated) pages.
+    # Before this widening every non-ADMIN role 403'd here, which is the
+    # same class of RBAC/reporting-interaction bug as VisitStepViewSet's
+    # (see GAP.md) — discovered while verifying the Executive Dashboard
+    # walkthrough end-to-end, not just testing as ADMIN (which bypasses all
+    # role checks and would have hidden this). write_roles stays
+    # ADMIN-only — editing the facility map is still admin-only, matching
+    # the "facility" nav item's ADMIN-only gating.
+    read_roles = (StaffUser.Role.REGISTRAR, StaffUser.Role.SERVICE_STAFF, StaffUser.Role.EXECUTIVE)
     write_roles = ()
 
 

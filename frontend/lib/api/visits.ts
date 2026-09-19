@@ -31,6 +31,7 @@ export type Visit = {
   pathway_template: number;
   visit_date: string; // "YYYY-MM-DD"
   created_at: string;
+  completed_at: string | null;
   status: VisitStatus;
   qr_token: string;
   current_node: number | null;
@@ -126,6 +127,16 @@ export function skipVisitStep(id: number, nextStepIds?: number[]): Promise<Visit
  * visit (see backend/visits/viewsets.py::VisitStepViewSet.insert_next).
  * `insertBeforeStepIds` are added as EXTRA prerequisites of those existing
  * steps, on top of whatever they already had. */
+/** Average total hospital time (registration -> completion), in minutes,
+ * across COMPLETED visits created within the last `days` days. Backed by
+ * `visits.views.total_time_stats` (Executive-Reports-only). `avg_minutes`
+ * is null when `count` is 0. */
+export type TotalTimeStats = { avg_minutes: number | null; count: number; days: number };
+
+export function fetchTotalTimeStats(days: number): Promise<TotalTimeStats> {
+  return apiFetch<TotalTimeStats>(`/visits/stats/total-time?days=${days}`);
+}
+
 export function insertVisitStep(
   id: number,
   servicePointId: number,

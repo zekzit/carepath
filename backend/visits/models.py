@@ -35,6 +35,12 @@ class Visit(models.Model):
     )
     visit_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set once the visit transitions to COMPLETED (see visits.services.sync_visit_completion). "
+        "Used for Executive Reports' average total-hospital-time metric.",
+    )
     status = models.CharField(max_length=20, choices=Status.choices)
     qr_token = models.CharField(max_length=64, unique=True)
     current_node = models.ForeignKey(

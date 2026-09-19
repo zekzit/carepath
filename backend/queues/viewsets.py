@@ -125,7 +125,15 @@ class QueueTicketViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = QueueTicket.objects.select_related("queue", "visit_step__visit__patient")
     serializer_class = QueueTicketSerializer
     permission_classes = [RoleRequired]
-    read_roles = (StaffUser.Role.SERVICE_STAFF,)
+    # REGISTRAR and EXECUTIVE both land on the Admin Portal Dashboard (see
+    # admin-nav.ts), which unconditionally reads ticket status to compute
+    # the "waiting" stat card for every role — QueueTicketSerializer never
+    # exposes patient identity (see queues/serializers.py: id/queue/
+    # visit_step/ticket_number/status/called_at only), so this is a safe,
+    # read-only widening. Same RBAC/reporting-interaction bug class as
+    # VisitStepViewSet's (see GAP.md), found while verifying the Executive
+    # Dashboard end-to-end. write_roles (serve/done) stays SERVICE_STAFF-only.
+    read_roles = (StaffUser.Role.SERVICE_STAFF, StaffUser.Role.REGISTRAR, StaffUser.Role.EXECUTIVE)
     write_roles = (StaffUser.Role.SERVICE_STAFF,)
 
     def get_queryset(self):

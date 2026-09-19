@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import type { AppLocale } from "@/i18n/locales";
 import { pathwayTemplatesApi, type PathwayTemplate } from "@/lib/api/pathway";
-import { listVisitSteps, visitsApi, VISIT_STATUSES, type Visit, type VisitStep } from "@/lib/api/visits";
+import { fetchWaitTimeStats, type ServicePointWaitStats } from "@/lib/api/queues";
+import {
+  fetchTotalTimeStats,
+  listVisitSteps,
+  visitsApi,
+  VISIT_STATUSES,
+  type TotalTimeStats,
+  type Visit,
+  type VisitStep,
+} from "@/lib/api/visits";
 
 const RANGE_OPTIONS = [7, 14, 30] as const;
 type RangeDays = (typeof RANGE_OPTIONS)[number];
@@ -37,17 +47,24 @@ function statusBadgeClass(status: Visit["status"]): string {
   }
 }
 
-/** Aggregates from the existing visits/visit-steps/pathway-template list
- * endpoints — there is no dedicated reporting endpoint yet, so everything
- * here is computed client-side over `visitsApi.list()` the same way
- * DashboardPage computes its stats over a single day. */
+/** `avgStepsPerVisit`/visits-per-day/by-template/by-status are still
+ * computed client-side over the existing visits/visit-steps/pathway-template
+ * list endpoints (fine at this hospital's data volume). Per-service-point
+ * wait time + bottleneck ranking and average total-hospital-time, however,
+ * are real backend aggregations (`GET /queues/stats/wait-times`, `GET
+ * /visits/stats/total-time` — see GAP.md FR-24) rather than client-side
+ * math over the full list, since those need to scale with data volume
+ * (NFR-05) and the server can compute them with a proper DB aggregate. */
 export function ReportsPage() {
   const t = useTranslations("admin");
+  const locale = useLocale() as AppLocale;
 
   const [loading, setLoading] = useState(true);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [visitSteps, setVisitSteps] = useState<VisitStep[]>([]);
   const [pathwayTemplates, setPathwayTemplates] = useState<PathwayTemplate[]>([]);
+  const [waitTimeStats, setWaitTimeStats] = useState<ServicePointWaitStats[]>([]);
+  const [totalTimeStats, setTotalTimeStats] = useState<TotalTimeStats | null>(null);
   const [rangeDays, setRangeDays] = useState<RangeDays>(7);
 
   useEffect(() => {
@@ -55,15 +72,17 @@ export function ReportsPage() {
     (async () => {
       setLoading(true);
       try {
-        const [visitsData, stepsData, templatesData] = await Promise.all([
+        const [visitsData, stepsData, templatesData, waitTimeData] = await Promise.all([
           visitsApi.list(),
           listVisitSteps(),
           pathwayTemplatesApi.list(),
+          fetchWaitTimeStats(),
         ]);
         if (cancelled) return;
         setVisits(visitsData);
         setVisitSteps(stepsData);
         setPathwayTemplates(templatesData);
+        setWaitTimeStats(waitTimeData);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -72,6 +91,21 @@ export function ReportsPage() {
       cancelled = true;
     };
   }, []);
+
+  // Average total hospital time is server-computed over `rangeDays` (see
+  // GET /visits/stats/total-time?days=), so it's re-fetched whenever the
+  // range selector changes — same range the other cards already filter to
+  // client-side.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await fetchTotalTimeStats(rangeDays);
+      if (!cancelled) setTotalTimeStats(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rangeDays]);
 
   const rangeStart = isoDateNDaysAgo(rangeDays - 1);
   const rangeVisits = useMemo(() => visits.filter((v) => v.visit_date >= rangeStart), [visits, rangeStart]);
@@ -125,11 +159,21 @@ export function ReportsPage() {
     count: rangeVisits.filter((v) => v.status === status).length,
   }));
 
+  const maxWaitMinutes = Math.max(1, ...waitTimeStats.map((row) => row.avg_minutes));
+  const bottleneckServicePointId = waitTimeStats[0]?.service_point_id ?? null;
+
   const cards = [
     { label: t("reportsTotalVisits"), value: String(totalVisits) },
     { label: t("reportsCompletionRate"), value: completionRate == null ? "—" : `${completionRate}%` },
     { label: t("reportsCancelledCount"), value: String(cancelledCount) },
     { label: t("reportsAvgStepsPerVisit"), value: avgStepsPerVisit ?? "—" },
+    {
+      label: t("reportsAvgTotalTime"),
+      value:
+        totalTimeStats?.avg_minutes == null
+          ? "—"
+          : `${Math.round(totalTimeStats.avg_minutes)} ${t("statAvgWaitUnit")}`,
+    },
   ];
 
   return (
@@ -158,7 +202,7 @@ export function ReportsPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-5 gap-4">
             {cards.map((stat) => (
               <div key={stat.label} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-[18px]">
                 <div className="text-[12px] text-[#7c8f8c]">{stat.label}</div>
@@ -222,6 +266,44 @@ export function ReportsPage() {
               </div>
             </div>
           )}
+
+          <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
+            <div className="mb-3 text-[14px] font-semibold text-[var(--ink)]">{t("reportsWaitByServicePointTitle")}</div>
+            {waitTimeStats.length === 0 ? (
+              <div className="py-6 text-center text-[12.5px] text-[var(--ink-faint)]">{t("reportsNoData")}</div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {waitTimeStats.map((row) => {
+                  const isBottleneck = row.service_point_id === bottleneckServicePointId;
+                  const name = locale === "th" ? row.name_th : row.name_en;
+                  return (
+                    <div key={row.service_point_id} className="flex items-center gap-3">
+                      <div className="flex w-48 shrink-0 items-center gap-1.5 truncate text-[12.5px] text-[var(--ink)]">
+                        <span className="truncate">{name}</span>
+                        {isBottleneck && (
+                          <span className="shrink-0 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
+                            {t("reportsBottleneckBadge")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-app)]">
+                        <div
+                          className={`h-full rounded-full ${isBottleneck ? "bg-red-500" : "bg-[var(--brand-teal)]"}`}
+                          style={{ width: `${(row.avg_minutes / maxWaitMinutes) * 100}%` }}
+                        />
+                      </div>
+                      <div className="w-20 shrink-0 text-right text-[12.5px] font-semibold text-[var(--ink)]">
+                        {row.avg_minutes} {t("statAvgWaitUnit")}
+                      </div>
+                      <div className="w-16 shrink-0 text-right text-[11px] text-[var(--ink-faint)]">
+                        {row.done_count} {t("reportsDoneCountSuffix")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>

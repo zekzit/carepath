@@ -29,3 +29,19 @@ class RoleRequired(BasePermission):
         write_roles = getattr(view, "write_roles", None)
         roles = read_roles if action in ("list", "retrieve") else (write_roles if write_roles else read_roles)
         return user.role in roles
+
+
+def allowed_roles(*roles):
+    """Permission factory for function-based (@api_view) views that don't
+    have RoleRequired's read_roles/write_roles/action machinery (there's no
+    `view.action` on a plain APIView-wrapped function). ADMIN always
+    bypasses, same as RoleRequired."""
+
+    class _AllowedRoles(BasePermission):
+        def has_permission(self, request, view):
+            user = request.user
+            if not (user and user.is_authenticated):
+                return False
+            return user.role == StaffUser.Role.ADMIN or user.role in roles
+
+    return _AllowedRoles

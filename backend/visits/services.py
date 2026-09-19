@@ -9,7 +9,8 @@ def sync_visit_completion(visit: Visit) -> None:
     statuses = set(visit.steps.values_list("status", flat=True))
     if statuses and statuses.issubset(terminal):
         visit.status = Visit.Status.COMPLETED
-        visit.save(update_fields=["status"])
+        visit.completed_at = timezone.now()
+        visit.save(update_fields=["status", "completed_at"])
 
 
 def complete_step(step: VisitStep) -> None:

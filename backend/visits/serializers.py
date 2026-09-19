@@ -98,6 +98,7 @@ class VisitSerializer(serializers.ModelSerializer):
             "pathway_template",
             "visit_date",
             "created_at",
+            "completed_at",
             "status",
             "qr_token",
             "current_node",
@@ -105,7 +106,8 @@ class VisitSerializer(serializers.ModelSerializer):
         ]
         # status/qr_token are set by create() below, not the caller;
         # current_node is only ever updated by a kiosk scan (later phase).
-        read_only_fields = ["created_at", "status", "qr_token", "current_node"]
+        # completed_at is set only by visits.services.sync_visit_completion.
+        read_only_fields = ["created_at", "completed_at", "status", "qr_token", "current_node"]
 
     @transaction.atomic
     def create(self, validated_data):
