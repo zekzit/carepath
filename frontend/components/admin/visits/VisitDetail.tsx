@@ -15,6 +15,7 @@ import {
 } from "@/lib/api/visits";
 import type { PathwayTemplate } from "@/lib/api/pathway";
 import { AdminStepTimeline } from "./AdminStepTimeline";
+import { VisitQrCodeButton } from "./VisitQrCodeButton";
 
 function detailFromError(err: unknown): string | null {
   if (err instanceof ApiError && err.body && typeof err.body === "object" && "detail" in err.body) {
@@ -90,15 +91,18 @@ export function VisitDetail({
         {t("backToVisits")}
       </button>
 
-      <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
-        <div className="text-[15px] font-semibold text-[var(--ink)]">{patient?.full_name ?? `#${visit.patient}`}</div>
-        <div className="text-[12.5px] text-[var(--ink-faint)]">
-          HN {patient?.hn_code ?? "—"} · {pathwayTemplate?.name_th ?? `#${visit.pathway_template}`} · {visit.visit_date}
+      <div className="flex items-start justify-between gap-4 rounded-[14px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
+        <div>
+          <div className="text-[15px] font-semibold text-[var(--ink)]">{patient?.full_name ?? `#${visit.patient}`}</div>
+          <div className="text-[12.5px] text-[var(--ink-faint)]">
+            HN {patient?.hn_code ?? "—"} · {pathwayTemplate?.name_th ?? `#${visit.pathway_template}`} · {visit.visit_date}
+          </div>
+          <div className="mt-1 text-[12px] text-[var(--ink-muted)]">
+            {t(`visitStatus.${visit.status}` as const)}
+            {visit.uses_wheelchair ? ` · ${t("colWheelchair")}` : ""}
+          </div>
         </div>
-        <div className="mt-1 text-[12px] text-[var(--ink-muted)]">
-          {t(`visitStatus.${visit.status}` as const)}
-          {visit.uses_wheelchair ? ` · ${t("colWheelchair")}` : ""}
-        </div>
+        <VisitQrCodeButton token={visit.qr_token} patientName={patient?.full_name ?? `#${visit.patient}`} hn={patient?.hn_code ?? "—"} />
       </div>
 
       {actionError && <div className="rounded-lg bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{actionError}</div>}
