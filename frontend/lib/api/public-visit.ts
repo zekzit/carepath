@@ -91,6 +91,24 @@ export async function fetchVisitByTokenClient(token: string): Promise<PublicVisi
   }
 }
 
+/**
+ * Client-only — Kiosk manual fallback (Phase 4): nobody can type a 64-char
+ * qr_token by hand, so this looks up *today's* Visit by HN instead (see
+ * backend/visits/views.py::visit_by_hn_today). Same null-on-failure contract
+ * as fetchVisitByTokenClient — a 404 (no visit today for this HN) or a
+ * network hiccup both just resolve to null for the caller to show as
+ * "not found", not a crash.
+ */
+export async function fetchVisitByHnTodayClient(hnCode: string): Promise<PublicVisit | null> {
+  try {
+    const res = await fetch(`/api/visits/by-hn-today/${encodeURIComponent(hnCode)}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 /** department_th/en is the clinical department name (e.g. "ห้องแล็บ") and is
  * preferred whenever non-empty; otherwise falls back to the node's own name. */
 export function serviceStepLocationName(step: PublicVisitStep, locale: AppLocale): string {

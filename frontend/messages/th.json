@@ -276,6 +276,12 @@
     "noLoginNote": "ไม่ต้องเข้าสู่ระบบ · จอสัมผัส",
     "scanDemoCta": "จำลองการสแกนสำเร็จ (demo)",
     "backToScanCta": "กลับไปหน้าสแกน",
-    "resetCta": "เสร็จแล้ว กลับสู่หน้าหลัก"
+    "resetCta": "เสร็จแล้ว กลับสู่หน้าหลัก",
+    "manualEntryTitle": "กรอกหมายเลข HN",
+    "manualEntryPlaceholder": "เช่น HN00001",
+    "manualEntrySubmit": "ค้นหา",
+    "manualEntrySearching": "กำลังค้นหา...",
+    "manualEntryBack": "กลับ",
+    "manualEntryNotFound": "ไม่พบข้อมูลนัดหมายวันนี้สำหรับหมายเลขนี้ กรุณาตรวจสอบอีกครั้งหรือติดต่อเจ้าหน้าที่"
   }
 }

@@ -276,6 +276,12 @@
     "noLoginNote": "No login needed · Touchscreen",
     "scanDemoCta": "Simulate a successful scan (demo)",
     "backToScanCta": "Back to scan screen",
-    "resetCta": "Done — back to home screen"
+    "resetCta": "Done — back to home screen",
+    "manualEntryTitle": "Enter your HN",
+    "manualEntryPlaceholder": "e.g. HN00001",
+    "manualEntrySubmit": "Search",
+    "manualEntrySearching": "Searching...",
+    "manualEntryBack": "Back",
+    "manualEntryNotFound": "No appointment found for this HN today. Please double-check or ask staff for help."
   }
 }
