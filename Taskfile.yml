@@ -1,0 +1,20 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Run the frontend and backend dev servers together
+    deps:
+      - dev:backend
+      - dev:frontend
+
+  dev:backend:
+    internal: true
+    dir: backend
+    cmds:
+      - venv/bin/python manage.py runserver 8000
+
+  dev:frontend:
+    internal: true
+    dir: frontend
+    cmds:
+      - npm run dev

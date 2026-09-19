@@ -2,6 +2,16 @@
 
 Initial scaffold: **Next.js** (frontend) + **Django** (backend) + **SQLite** (database).
 
+## Quick start
+
+Run both dev servers together with [Task](https://taskfile.dev) (`brew install go-task`):
+
+```bash
+task dev
+```
+
+This starts Django on `:8000` and Next.js on `:3000`. Open `http://localhost:3000`. Ctrl+C stops both. See `Taskfile.yml`. First-time setup (venv, `pip install`, `npm install`, `migrate`) is still manual — see below.
+
 ## Structure
 
 ```
