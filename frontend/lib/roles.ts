@@ -10,6 +10,3 @@ export const ROLE_META: Record<StaffRole, { labelTh: string; labelEn: string; co
 };
 
 export const ALL_STAFF_ROLES: StaffRole[] = ["REGISTRAR", "SERVICE_STAFF", "EXECUTIVE", "ADMIN"];
-
-// TODO: replace with the signed-in StaffUser's real role once auth lands.
-export const CURRENT_ROLE: StaffRole = "ADMIN";

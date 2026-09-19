@@ -54,6 +54,16 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = 'accounts.StaffUser'
 
+# No per-role enforcement yet (see IMPLEMENT_PLAN.md Phase 0 decision log) —
+# accounts/views.py wires up real session login so the Admin Portal knows
+# the signed-in StaffUser's actual role, but every endpoint stays AllowAny
+# until a future phase adds role-based permission classes.
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -66,6 +76,17 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
+# The browser only ever talks to the Next.js origin (it proxies /api/* to us
+# server-side, see frontend/next.config.ts) but that proxy does not
+# necessarily preserve the original Host header, so Django's same-origin
+# Referer/Origin check for CSRF can't rely on request.get_host() matching.
+# Trusting the frontend origin explicitly keeps POST /api/accounts/login
+# (and every other mutating endpoint) working through the proxy.
+CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]

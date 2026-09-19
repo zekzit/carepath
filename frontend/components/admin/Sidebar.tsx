@@ -4,10 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ADMIN_NAV_GROUPS } from "@/lib/admin-nav";
-import { ALL_STAFF_ROLES, CURRENT_ROLE, ROLE_META } from "@/lib/roles";
+import { ALL_STAFF_ROLES, ROLE_META } from "@/lib/roles";
 import { MapPinIcon } from "@/components/icons";
+import type { CurrentStaffUser } from "@/lib/api/server";
 
-export function Sidebar() {
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+export function Sidebar({ currentUser }: { currentUser: CurrentStaffUser }) {
   const pathname = usePathname();
   const t = useTranslations("admin");
 
@@ -23,20 +31,19 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* TODO: replace with the signed-in StaffUser once auth lands (lib/roles.ts CURRENT_ROLE). */}
       <div className="flex items-center gap-2.5 border-b border-white/10 px-[22px] py-3.5">
         <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--brand-ink-soft)] text-[13px] font-bold">
-          อธ
+          {getInitials(currentUser.full_name)}
         </div>
         <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold">อธิษฐาน ใจดี</div>
-          <div className="text-[11px] text-[#8fbdb5]">{t("userRoleLabel")}</div>
+          <div className="truncate text-[13px] font-semibold">{currentUser.full_name}</div>
+          <div className="text-[11px] text-[#8fbdb5]">{ROLE_META[currentUser.role].labelTh}</div>
         </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-3 overflow-auto p-3">
         {ADMIN_NAV_GROUPS.map((group) => {
-          const visibleItems = group.items.filter((item) => item.roles.includes(CURRENT_ROLE));
+          const visibleItems = group.items.filter((item) => item.roles.includes(currentUser.role));
           if (visibleItems.length === 0) return null;
 
           return (

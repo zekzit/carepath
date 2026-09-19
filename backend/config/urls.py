@@ -22,6 +22,11 @@ from django.urls import include, path
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),
+    path('api/accounts/', include('accounts.urls')),
+    path('api/facility/', include('facility.urls')),
+    path('api/pathway/', include('pathway.urls')),
+    path('api/visits/', include('visits.urls')),
+    path('api/queues/', include('queues.urls')),
 ]
 
 if settings.DEBUG:

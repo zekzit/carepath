@@ -18,8 +18,6 @@
   },
   "admin": {
     "breadcrumb": "Admin",
-    "dashboardTitle": "Dashboard",
-    "dashboardTitleEn": "Dashboard",
     "statPatientsToday": "Patients today",
     "statWaiting": "Waiting",
     "statAvgWait": "Avg. wait time",
@@ -28,8 +26,15 @@
     "placeholderTitle": "This page is under construction",
     "placeholderDescription": "Content placeholder — navigation is scaffolded first, this page isn't built yet",
     "roleLegendTitle": "Menu visibility by role",
-    "userRoleLabel": "Admin",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "logout": "Log out",
+    "loginTitle": "Sign in",
+    "loginSubtitle": "For hospital staff",
+    "loginUsername": "Username",
+    "loginPassword": "Password",
+    "loginSubmit": "Sign in",
+    "loginSubmitting": "Signing in...",
+    "loginError": "Incorrect username or password"
   },
   "patient": {
     "greeting": "Hello,",

@@ -18,8 +18,6 @@
   },
   "admin": {
     "breadcrumb": "Admin",
-    "dashboardTitle": "ภาพรวม",
-    "dashboardTitleEn": "Dashboard",
     "statPatientsToday": "ผู้ป่วยวันนี้",
     "statWaiting": "กำลังรอคิว",
     "statAvgWait": "เวลารอเฉลี่ย",
@@ -28,8 +26,15 @@
     "placeholderTitle": "เนื้อหาหน้านี้อยู่ระหว่างพัฒนา",
     "placeholderDescription": "Content placeholder — วางโครงเมนูก่อน ยังไม่ทำหน้านี้จริง",
     "roleLegendTitle": "แสดงเมนูตามสิทธิ์",
-    "userRoleLabel": "ผู้ดูแลระบบ",
-    "notifications": "การแจ้งเตือน"
+    "notifications": "การแจ้งเตือน",
+    "logout": "ออกจากระบบ",
+    "loginTitle": "เข้าสู่ระบบ",
+    "loginSubtitle": "สำหรับเจ้าหน้าที่โรงพยาบาล",
+    "loginUsername": "ชื่อผู้ใช้",
+    "loginPassword": "รหัสผ่าน",
+    "loginSubmit": "เข้าสู่ระบบ",
+    "loginSubmitting": "กำลังเข้าสู่ระบบ...",
+    "loginError": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
   },
   "patient": {
     "greeting": "สวัสดีคุณ",

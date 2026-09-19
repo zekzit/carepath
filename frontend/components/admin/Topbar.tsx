@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { findActiveAdminNavItem } from "@/lib/admin-nav";
 import { BellIcon } from "@/components/icons";
 import { StaffLanguageSwitcher } from "./StaffLanguageSwitcher";
+import { LogoutButton } from "./LogoutButton";
 
 export function Topbar() {
   const pathname = usePathname();
@@ -26,6 +27,7 @@ export function Topbar() {
         <button type="button" aria-label={t("notifications")} className="text-[#5b6e6b]">
           <BellIcon width={20} height={20} />
         </button>
+        <LogoutButton />
       </div>
     </div>
   );
