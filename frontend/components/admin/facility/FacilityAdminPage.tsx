@@ -17,8 +17,9 @@ import { BuildingsSection } from "./BuildingsSection";
 import { FloorsSection } from "./FloorsSection";
 import { NodesSection } from "./NodesSection";
 import { EdgesSection } from "./EdgesSection";
+import { FloorMapSection } from "./FloorMapSection";
 
-type TabId = "buildings" | "floors" | "nodes" | "edges";
+type TabId = "buildings" | "floors" | "nodes" | "edges" | "map";
 
 async function fetchFacilityData() {
   const [buildings, floors, nodes, edges] = await Promise.all([
@@ -82,6 +83,7 @@ export function FacilityAdminPage() {
     { id: "floors", label: t("facilityTabFloors") },
     { id: "nodes", label: t("facilityTabNodes") },
     { id: "edges", label: t("facilityTabEdges") },
+    { id: "map", label: t("facilityTabMap") },
   ];
 
   return (
@@ -96,6 +98,16 @@ export function FacilityAdminPage() {
         <NodesSection nodes={nodes} floors={floors} buildings={buildings} loading={loading} refetch={refetchAll} />
       )}
       {tab === "edges" && <EdgesSection edges={edges} nodes={nodes} loading={loading} refetch={refetchAll} />}
+      {tab === "map" && (
+        <FloorMapSection
+          floors={floors}
+          buildings={buildings}
+          nodes={nodes}
+          edges={edges}
+          loading={loading}
+          refetch={refetchAll}
+        />
+      )}
     </div>
   );
 }

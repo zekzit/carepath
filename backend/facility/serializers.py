@@ -14,9 +14,7 @@ class BuildingSerializer(serializers.ModelSerializer):
 class FloorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Floor
-        fields = ["id", "building", "level_no", "name_th", "name_en", "plan_scale_m_per_px"]
-        # plan_image is uploaded separately in Phase 5 (needs multipart
-        # parsing + the drag/calibrate editor) — deliberately omitted here.
+        fields = ["id", "building", "level_no", "name_th", "name_en", "plan_scale_m_per_px", "plan_image"]
 
 
 class NodeSerializer(CleanOnValidateMixin, serializers.ModelSerializer):
@@ -41,6 +39,10 @@ class NodeSerializer(CleanOnValidateMixin, serializers.ModelSerializer):
 
 
 class EdgeSerializer(serializers.ModelSerializer):
+    # MODELS.md § 1 (Edge.distance_m): "คำนวณจาก pos_x/pos_y × scale หรือกรอกระยะจริง" —
+    # optional here so it can be auto-calculated in validate() below when omitted.
+    distance_m = serializers.FloatField(required=False)
+
     class Meta:
         model = Edge
         fields = [
@@ -53,3 +55,34 @@ class EdgeSerializer(serializers.ModelSerializer):
             "is_bidirectional",
             "wheelchair_accessible",
         ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs.get("distance_m") is not None:
+            return attrs
+
+        from_node = attrs.get("from_node") or getattr(self.instance, "from_node", None)
+        to_node = attrs.get("to_node") or getattr(self.instance, "to_node", None)
+        computed = self._auto_distance(from_node, to_node)
+        if computed is None:
+            raise serializers.ValidationError(
+                {
+                    "distance_m": (
+                        "Could not auto-calculate — from_node/to_node must be on the same "
+                        "calibrated floor (Floor.plan_scale_m_per_px set), otherwise enter it manually."
+                    )
+                }
+            )
+        attrs["distance_m"] = computed
+        return attrs
+
+    @staticmethod
+    def _auto_distance(from_node, to_node):
+        if from_node is None or to_node is None or from_node.floor_id != to_node.floor_id:
+            return None
+        scale = from_node.floor.plan_scale_m_per_px
+        if not scale:
+            return None
+        dx = from_node.pos_x - to_node.pos_x
+        dy = from_node.pos_y - to_node.pos_y
+        return round(((dx**2 + dy**2) ** 0.5) * scale, 2)

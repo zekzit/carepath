@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { RecordFormSheet, type FieldConfig, type FormValues } from "@/components/admin/RecordFormSheet";
 import { EDGE_TYPES, edgesApi, type EdgeType, type FacilityEdge, type FacilityNode } from "@/lib/api/facility";
-import { bool, id, int, num, str } from "@/lib/admin-form-utils";
+import { bool, id, int, optionalNum, str } from "@/lib/admin-form-utils";
 
 function edgeToFormValues(edge: FacilityEdge): FormValues {
   return {
@@ -52,7 +52,7 @@ export function EdgesSection({
       required: true,
       options: EDGE_TYPES.map((type) => ({ value: type, label: edgeTypeLabel(type) })),
     },
-    { name: "distance_m", label: t("colDistance"), type: "number", required: true },
+    { name: "distance_m", label: t("colDistance"), type: "number", helpText: t("edgeDistanceHelp") },
     { name: "walk_time_sec", label: t("colWalkTime"), type: "integer", required: true },
     { name: "is_bidirectional", label: t("colBidirectional"), type: "checkbox" },
     { name: "wheelchair_accessible", label: t("colWheelchair"), type: "checkbox" },
@@ -77,10 +77,14 @@ export function EdgesSection({
   }
 
   async function handleSubmit(values: FormValues) {
+    // `distance_m` is optional on write (Phase 5): a blank field must OMIT the
+    // key entirely (not send `null`/`""`) so the backend's auto-calculate path
+    // kicks in — DRF rejects both `null` and `""` as invalid floats.
+    const distanceM = optionalNum(values.distance_m);
     const payload = {
       from_node: id(values.from_node),
       to_node: id(values.to_node),
-      distance_m: num(values.distance_m),
+      ...(distanceM != null ? { distance_m: distanceM } : {}),
       edge_type: str(values.edge_type) as EdgeType,
       walk_time_sec: int(values.walk_time_sec),
       is_bidirectional: bool(values.is_bidirectional),

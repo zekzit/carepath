@@ -249,6 +249,28 @@ export function TrashIcon(props: IconProps) {
   );
 }
 
+export function UploadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </Icon>
+  );
+}
+
+export function RulerIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 17 17 3l4 4L7 21H3v-4z" />
+      <line x1="14.5" y1="5.5" x2="16.5" y2="7.5" />
+      <line x1="11.5" y1="8.5" x2="13.5" y2="10.5" />
+      <line x1="8.5" y1="11.5" x2="10.5" y2="13.5" />
+      <line x1="5.5" y1="14.5" x2="7.5" y2="16.5" />
+    </Icon>
+  );
+}
+
 export function XIcon(props: IconProps) {
   return (
     <Icon {...props}>

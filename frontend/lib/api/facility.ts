@@ -1,3 +1,4 @@
+import { apiFetch } from "./client";
 import { createResourceClient } from "./resource";
 
 export type Building = {
@@ -15,8 +16,16 @@ export type Floor = {
   name_th: string;
   name_en: string;
   plan_scale_m_per_px: number | null;
+  // Full absolute URL (e.g. "http://127.0.0.1:8000/media/floor_plans/xyz.png") or null
+  // if never uploaded — usable directly as an <img src>. Read-only in practice: it is
+  // never sent as part of `FloorInput` (see `uploadFloorPlanImage` below for the
+  // separate multipart upload path).
+  plan_image: string | null;
 };
-export type FloorInput = Omit<Floor, "id">;
+// The plain-JSON create/update shape used by the Floors CRUD form. Deliberately
+// excludes `plan_image` — uploading/replacing the floor plan image is a separate
+// multipart request (see `uploadFloorPlanImage`), not part of this JSON payload.
+export type FloorInput = Omit<Floor, "id" | "plan_image">;
 
 export const NODE_TYPES = ["SERVICE_POINT", "JUNCTION", "VERTICAL_CONNECTOR", "KIOSK", "ENTRANCE"] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
@@ -53,9 +62,24 @@ export type FacilityEdge = {
   is_bidirectional: boolean;
   wheelchair_accessible: boolean;
 };
-export type FacilityEdgeInput = Omit<FacilityEdge, "id">;
+// `distance_m` is optional on write (Phase 5): omit the key entirely to let the
+// backend auto-calculate it from the two nodes' positions and the floor's
+// `plan_scale_m_per_px` — see EdgesSection.tsx / FloorMapSection.tsx for callers.
+export type FacilityEdgeInput = Omit<FacilityEdge, "id" | "distance_m"> & { distance_m?: number };
 
 export const buildingsApi = createResourceClient<Building, BuildingInput>("/facility/buildings");
 export const floorsApi = createResourceClient<Floor, FloorInput>("/facility/floors");
 export const nodesApi = createResourceClient<FacilityNode, FacilityNodeInput>("/facility/nodes");
 export const edgesApi = createResourceClient<FacilityEdge, FacilityEdgeInput>("/facility/edges");
+
+/**
+ * Uploads (or replaces) a Floor's plan image via multipart PATCH. Deliberately
+ * bypasses `floorsApi.update()` (which always `JSON.stringify`s its payload —
+ * wrong for a file) and calls `apiFetch` directly with a `FormData` body, which
+ * `apiFetch` now knows not to force `Content-Type: application/json` onto.
+ */
+export function uploadFloorPlanImage(floorId: number, file: File): Promise<Floor> {
+  const formData = new FormData();
+  formData.append("plan_image", file);
+  return apiFetch<Floor>(`/facility/floors/${floorId}`, { method: "PATCH", body: formData });
+}
