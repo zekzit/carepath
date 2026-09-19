@@ -3,6 +3,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from accounts.services import log_action
 from queues.services import ensure_ticket_for_step
 
 from . import services
@@ -70,6 +71,7 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
             step.visit.save(update_fields=["status"])
 
         ensure_ticket_for_step(step)
+        log_action(request.user, "START_VISIT_STEP", "VisitStep", step.id, {"visit": step.visit_id})
         return Response(VisitStepSerializer(step).data)
 
     @action(detail=True, methods=["post"])
@@ -79,6 +81,7 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": f"Step is {step.status}, not IN_PROGRESS."}, status=400)
         services.complete_step(step)
         step.refresh_from_db()
+        log_action(request.user, "COMPLETE_VISIT_STEP", "VisitStep", step.id, {"visit": step.visit_id})
         return Response(VisitStepSerializer(step).data)
 
     @action(detail=True, methods=["post"])
@@ -88,4 +91,5 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": f"Step is already {step.status}."}, status=400)
         services.skip_step(step)
         step.refresh_from_db()
+        log_action(request.user, "SKIP_VISIT_STEP", "VisitStep", step.id, {"visit": step.visit_id})
         return Response(VisitStepSerializer(step).data)

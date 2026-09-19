@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from . import services
 from .serializers import StaffUserSerializer
 
 
@@ -21,12 +22,15 @@ def login_view(request):
         return Response({"detail": "Invalid credentials."}, status=400)
 
     login(request, user)
+    services.log_action(user, "LOGIN", "StaffUser", user.id)
     return Response(StaffUserSerializer(user).data)
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def logout_view(request):
+    if request.user.is_authenticated:
+        services.log_action(request.user, "LOGOUT", "StaffUser", request.user.id)
     logout(request)
     return Response(status=204)
 

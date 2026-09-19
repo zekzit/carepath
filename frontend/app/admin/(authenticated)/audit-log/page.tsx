@@ -1,5 +1,5 @@
-import { PlaceholderContent } from "@/components/admin/PlaceholderContent";
+import { AuditLogPage } from "@/components/admin/audit-log/AuditLogPage";
 
 export default function Page() {
-  return <PlaceholderContent />;
+  return <AuditLogPage />;
 }

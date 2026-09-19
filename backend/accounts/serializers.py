@@ -3,7 +3,7 @@ from rest_framework import serializers
 from core.serializers import CleanOnValidateMixin
 from facility.models import Node
 
-from .models import ServicePointStaff, StaffUser
+from .models import AuditLog, ServicePointStaff, StaffUser
 
 
 class StaffUserSerializer(serializers.ModelSerializer):
@@ -56,3 +56,16 @@ class ServicePointStaffSerializer(CleanOnValidateMixin, serializers.ModelSeriali
     class Meta:
         model = ServicePointStaff
         fields = ["id", "staff_user", "service_point"]
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """Read-only — rows are only ever written by accounts.services.log_action."""
+
+    staff_username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = ["id", "staff_user", "staff_username", "action", "target_type", "target_id", "detail", "created_at"]
+
+    def get_staff_username(self, obj):
+        return obj.staff_user.username if obj.staff_user else None
