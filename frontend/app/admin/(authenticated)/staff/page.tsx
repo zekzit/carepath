@@ -1,5 +1,5 @@
-import { PlaceholderContent } from "@/components/admin/PlaceholderContent";
+import { StaffAdminPage } from "@/components/admin/staff/StaffAdminPage";
 
 export default function Page() {
-  return <PlaceholderContent />;
+  return <StaffAdminPage />;
 }

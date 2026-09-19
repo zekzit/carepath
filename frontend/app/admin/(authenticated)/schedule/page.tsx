@@ -1,5 +1,5 @@
-import { PlaceholderContent } from "@/components/admin/PlaceholderContent";
+import { ScheduleAdminPage } from "@/components/admin/schedule/ScheduleAdminPage";
 
 export default function Page() {
-  return <PlaceholderContent />;
+  return <ScheduleAdminPage />;
 }
