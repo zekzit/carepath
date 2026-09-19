@@ -1,0 +1,6 @@
+id,care_category_id,name_th,name_en,is_active
+1,1,ผู้ป่วยใหม่ — ตรวจอายุรกรรมทั่วไป,New Patient — General Medicine Check,1
+2,2,ตรวจสุขภาพประจำปี,Annual Health Check,1
+3,3,ตรวจตา,Eye Clinic Visit,1
+4,4,เจาะเลือด / ตรวจแล็บ,Blood Test / Lab Work,1
+5,5,ฉุกเฉิน / อุบัติเหติ,Emergency / Trauma,1

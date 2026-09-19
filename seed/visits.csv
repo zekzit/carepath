@@ -1,0 +1,5 @@
+id,patient_hn_code,pathway_template_id,visit_date,created_at,status,qr_token,current_node_id,uses_wheelchair
+1,HN-2026-0001,1,2026-09-19,2026-09-19 08:15:00,IN_PROGRESS,demo-qr-vj-thai-patient01-visit01-20260919-0000000000,13,0
+2,HN-2026-0002,4,2026-09-19,2026-09-19 09:00:00,REGISTERED,demo-qr-vj-en-patient02-visit01-20260919-000000000000,1,0
+3,HN-2026-0003,2,2026-09-19,2026-09-19 10:30:00,IN_PROGRESS,demo-qr-vj-en-patient03-visit01-20260919-000000000000,5,1
+4,HN-2026-0004,3,2026-09-19,2026-09-19 11:15:00,IN_PROGRESS,demo-qr-vj-thai-patient04-visit01-20260919-000000000000,19,1

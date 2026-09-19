@@ -1,0 +1,6 @@
+id,building_id,level_no,name_th,name_en,plan_image_filename,plan_scale_m_per_px
+1,1,1,ชั้น 1 อาคารผู้ป่วยนอก,OPD 1st Floor,opd_floor1.png,0.02
+2,1,2,ชั้น 2 อาคารผู้ป่วยนอก,OPD 2nd Floor,opd_floor2.png,0.02
+3,1,3,ชั้น 3 อาคารผู้ป่วยนอก,OPD 3rd Floor,opd_floor3.png,0.02
+4,1,4,ชั้น 4 อาคารผู้ป่วยนอก,OPD 4th Floor,opd_floor4.png,0.02
+5,2,1,ชั้น 1 อาคารอุบัติเหตุและศูนย์หัวใจ,ER & Heart Center 1st Floor,er_floor1.png,0.025
