@@ -138,7 +138,18 @@ def serialize_public_visit(visit: Visit) -> dict:
     }
 
 
-@extend_schema(responses={200: public_visit_response, 404: _not_found_response})
+@extend_schema(
+    summary="Resolve a visit by its public qr_token",
+    description=(
+        "Public, permanent `AllowAny` — the `qr_token` itself (64 random "
+        "chars set on `Visit` creation) is the credential, per MODELS.md's "
+        "design (no separate auth for patients). Returns the same read-only "
+        "visit shape used by the Patient Portal and (Phase 4) the Kiosk "
+        "Portal. Never look this up by `Visit.id`, which is sequential and "
+        "guessable."
+    ),
+    responses={200: public_visit_response, 404: _not_found_response},
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def visit_by_token(request, qr_token):
@@ -150,7 +161,19 @@ def visit_by_token(request, qr_token):
     return Response(serialize_public_visit(visit))
 
 
-@extend_schema(responses={200: public_visit_response, 404: _not_found_response})
+@extend_schema(
+    summary="Resolve today's visit for a patient by HN code",
+    description=(
+        "Kiosk manual-fallback lookup (Phase 4) — nobody can type a 64-char "
+        "`qr_token` by hand, so the \"or enter your HN\" path looks up "
+        "*today's* `Visit` for that HN instead and returns the same shape "
+        "as `visit_by_token`. Scoped to today only (not full history) to "
+        "limit what a bare HN code (unlike `qr_token`, not a random secret) "
+        "can expose through a public endpoint. If a patient somehow has "
+        "more than one visit today, the most recently created one wins."
+    ),
+    responses={200: public_visit_response, 404: _not_found_response},
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def visit_by_hn_today(request, hn_code):

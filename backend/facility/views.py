@@ -9,6 +9,14 @@ from .models import Node
 
 
 @extend_schema(
+    summary="Resolve a kiosk by its device_code",
+    description=(
+        "Public, permanent `AllowAny` — a kiosk terminal identifies itself "
+        "by `device_code` (its own URL, e.g. `/kiosk/<device_code>`) and "
+        "has no account/session of its own, same rationale as "
+        "`Visit.qr_token` for patients (see MODELS.md § 1 and "
+        "`visits.views.visit_by_token`)."
+    ),
     responses=inline_serializer(
         name="KioskResponse",
         fields={

@@ -19,6 +19,13 @@ _error_with_detail = inline_serializer(
 
 @ensure_csrf_cookie
 @extend_schema(
+    summary="Log in a staff user",
+    description=(
+        "Verifies username/password against `accounts.StaffUser`, opens a "
+        "Django session, and returns the auth-facing `StaffUser` shape used "
+        "by the Admin Portal's sidebar/topbar. Writes an `AuditLog` row of "
+        "action `LOGIN` on success."
+    ),
     request=inline_serializer(
         name="LoginRequest",
         fields={
@@ -49,6 +56,8 @@ def login_view(request):
 
 
 @extend_schema(
+    summary="Log out the current staff user",
+    description="Drops the session and writes an `AuditLog` row of action `LOGOUT` if a user was signed in.",
     request=OpenApiTypes.NONE,
     responses={204: OpenApiResponse(description="No content")},
 )
@@ -63,6 +72,13 @@ def logout_view(request):
 
 @ensure_csrf_cookie
 @extend_schema(
+    summary="Return the currently signed-in staff user",
+    description=(
+        "Returns the `StaffUser` shape for whoever holds the session, or "
+        "401 if nobody does. Side effect: primes the `csrftoken` cookie — "
+        "the frontend hits this first, before any login/mutation, so the "
+        "next POST/PUT has a CSRF token to send back."
+    ),
     responses={
         200: StaffUserSerializer,
         401: _error_with_detail,

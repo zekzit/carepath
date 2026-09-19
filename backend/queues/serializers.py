@@ -7,7 +7,15 @@ from .models import Queue, QueueTicket, ServiceSchedule
 
 
 class ServiceScheduleSerializer(CleanOnValidateMixin, serializers.ModelSerializer):
-    service_point = serializers.PrimaryKeyRelatedField(queryset=Node.objects.filter(node_type=Node.NodeType.SERVICE_POINT))
+    service_point = serializers.PrimaryKeyRelatedField(
+        queryset=Node.objects.filter(node_type=Node.NodeType.SERVICE_POINT),
+        help_text="Service-point node this schedule applies to.",
+    )
+    day_of_week = serializers.IntegerField(
+        help_text="0=Monday … 6=Sunday (Python's `weekday()` convention).",
+    )
+    open_time = serializers.TimeField(help_text="Opening time on `day_of_week`.")
+    close_time = serializers.TimeField(help_text="Closing time on `day_of_week`.")
 
     class Meta:
         model = ServiceSchedule
@@ -15,6 +23,15 @@ class ServiceScheduleSerializer(CleanOnValidateMixin, serializers.ModelSerialize
 
 
 class QueueSerializer(serializers.ModelSerializer):
+    service_point = serializers.PrimaryKeyRelatedField(
+        queryset=Node.objects.filter(node_type=Node.NodeType.SERVICE_POINT),
+        help_text="Service point this queue belongs to.",
+    )
+    queue_date = serializers.DateField(help_text="Date the queue is active for (one queue per service point per day).")
+    current_number = serializers.IntegerField(
+        help_text="Highest `ticket_number` that has been CALLED so far today; updated by the `call-next` action.",
+    )
+
     class Meta:
         model = Queue
         fields = ["id", "service_point", "queue_date", "current_number"]
@@ -24,6 +41,14 @@ class QueueSerializer(serializers.ModelSerializer):
 
 
 class QueueTicketSerializer(serializers.ModelSerializer):
+    status = serializers.ChoiceField(
+        choices=QueueTicket.Status.choices,
+        help_text="WAITING → CALLED → SERVING → DONE. Transitions are driven by the call-next/serve/done actions.",
+    )
+    called_at = serializers.DateTimeField(
+        help_text="Set when the ticket is moved to `CALLED` via the queue's `call-next` action.",
+    )
+
     class Meta:
         model = QueueTicket
         fields = ["id", "queue", "visit_step", "ticket_number", "status", "called_at"]

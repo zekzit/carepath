@@ -13,13 +13,34 @@ class CareCategorySerializer(serializers.ModelSerializer):
 
 
 class PathwayTemplateSerializer(serializers.ModelSerializer):
+    care_category = serializers.PrimaryKeyRelatedField(
+        queryset=CareCategory.objects.all(),
+        help_text="Care category this template belongs to.",
+    )
+    is_active = serializers.BooleanField(
+        required=False,
+        help_text="Inactive templates are hidden from the visit-registration picker.",
+    )
+
     class Meta:
         model = PathwayTemplate
         fields = ["id", "care_category", "name_th", "name_en", "is_active"]
 
 
 class TemplateStepSerializer(CleanOnValidateMixin, serializers.ModelSerializer):
-    service_point = serializers.PrimaryKeyRelatedField(queryset=Node.objects.filter(node_type=Node.NodeType.SERVICE_POINT))
+    service_point = serializers.PrimaryKeyRelatedField(
+        queryset=Node.objects.filter(node_type=Node.NodeType.SERVICE_POINT),
+        help_text="Service-point node this step directs patients to.",
+    )
+    sequence_order = serializers.IntegerField(
+        help_text="0-based ordinal within the template. Drives the default visit order; explicit `prerequisite_steps` override it for branches.",
+    )
+    prerequisite_steps = serializers.PrimaryKeyRelatedField(
+        many=True,
+        required=False,
+        queryset=TemplateStep.objects.all(),
+        help_text="Other `TemplateStep` ids in the same `pathway_template` that must be `DONE` before this one can start. A `SKIPPED` prerequisite does NOT count.",
+    )
 
     class Meta:
         model = TemplateStep

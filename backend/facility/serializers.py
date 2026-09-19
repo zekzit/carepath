@@ -6,18 +6,71 @@ from .models import Building, Edge, Floor, Node
 
 
 class BuildingSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(help_text="Short unique identifier (e.g. `B1`, `OPD`).")
+
     class Meta:
         model = Building
         fields = ["id", "name_th", "name_en", "code"]
 
 
 class FloorSerializer(serializers.ModelSerializer):
+    level_no = serializers.IntegerField(help_text="Numeric level — 1 = ground, 2 = first floor up, etc.")
+    plan_scale_m_per_px = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        help_text="Metres per pixel on `plan_image`. Required for auto-calculating edge distances on this floor; leave null otherwise.",
+    )
+    plan_image = serializers.ImageField(
+        required=False,
+        allow_null=True,
+        help_text="Floor plan image. Used as the visual backdrop for node coordinates.",
+    )
+
     class Meta:
         model = Floor
         fields = ["id", "building", "level_no", "name_th", "name_en", "plan_scale_m_per_px", "plan_image"]
 
 
 class NodeSerializer(CleanOnValidateMixin, serializers.ModelSerializer):
+    floor = serializers.PrimaryKeyRelatedField(
+        queryset=Floor.objects.all(),
+        help_text="Floor this node sits on.",
+    )
+    node_type = serializers.ChoiceField(
+        choices=Node.NodeType.choices,
+        help_text="ROOM | SERVICE_POINT | KIOSK | VERTICAL_CONNECTOR.",
+    )
+    pos_x = serializers.FloatField(
+        help_text="X coordinate on `Floor.plan_image`, in image pixels. Origin at top-left.",
+    )
+    pos_y = serializers.FloatField(
+        help_text="Y coordinate on `Floor.plan_image`, in image pixels. Origin at top-left.",
+    )
+    vertical_group = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Identifier shared by vertical connectors (elevators/stairs) that serve the same shaft across floors.",
+    )
+    location_qr_code = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="QR payload printed at this physical location. Patients scan it to mark `Visit.current_node`.",
+    )
+    service_point_code = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Short business code for service-point nodes (used by templates/queues). Required when `node_type=SERVICE_POINT` (enforced in `Node.clean()`).",
+    )
+    device_code = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Unique per physical kiosk. Looked up via `GET /api/facility/kiosks/{device_code}`. Required when `node_type=KIOSK` (enforced in `Node.clean()`).",
+    )
+    is_active = serializers.BooleanField(
+        required=False,
+        help_text="Inactive nodes are hidden from patient-facing routing.",
+    )
+
     class Meta:
         model = Node
         fields = [
@@ -41,7 +94,27 @@ class NodeSerializer(CleanOnValidateMixin, serializers.ModelSerializer):
 class EdgeSerializer(serializers.ModelSerializer):
     # MODELS.md § 1 (Edge.distance_m): "คำนวณจาก pos_x/pos_y × scale หรือกรอกระยะจริง" —
     # optional here so it can be auto-calculated in validate() below when omitted.
-    distance_m = serializers.FloatField(required=False)
+    distance_m = serializers.FloatField(
+        required=False,
+        help_text="Edge length in metres. Optional on create — auto-calculated from `from_node`/`to_node` positions when both are on the same calibrated floor.",
+    )
+    edge_type = serializers.ChoiceField(
+        choices=Edge.EdgeType.choices,
+        help_text="CORRIDOR | STAIRS | ELEVATOR. Affects route-finding heuristics.",
+    )
+    walk_time_sec = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Optional cached walk-time estimate in seconds; used by the route planner as a hint.",
+    )
+    is_bidirectional = serializers.BooleanField(
+        required=False,
+        help_text="Default true. False means the edge only goes `from_node` → `to_node`.",
+    )
+    wheelchair_accessible = serializers.BooleanField(
+        required=False,
+        help_text="If false, the route planner excludes this edge when `Visit.uses_wheelchair` is true.",
+    )
 
     class Meta:
         model = Edge

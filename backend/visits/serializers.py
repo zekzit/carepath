@@ -9,12 +9,40 @@ from .models import Patient, Visit, VisitStep
 
 
 class PatientSerializer(serializers.ModelSerializer):
+    hn_code = serializers.CharField(help_text="Hospital Number — the patient's unique identifier across visits.")
+    dob = serializers.DateField(help_text="Date of birth.")
+    national_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Thai national ID (13 digits). Optional — some patients may not have one on file.",
+    )
+    phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Contact phone. Optional.",
+    )
+    preferred_language = serializers.ChoiceField(
+        choices=Patient.Language.choices,
+        help_text="TH | EN. Drives Patient Portal UI language and message tone.",
+    )
+
     class Meta:
         model = Patient
         fields = ["id", "hn_code", "full_name", "dob", "national_id", "phone", "preferred_language"]
 
 
 class VisitStepSerializer(serializers.ModelSerializer):
+    sequence_order = serializers.IntegerField(help_text="0-based ordinal within the parent visit.")
+    status = serializers.ChoiceField(
+        choices=VisitStep.Status.choices,
+        help_text="PENDING → IN_PROGRESS → DONE. `SKIPPED` is also possible. Transitions are driven by the start/complete/skip actions.",
+    )
+    is_planned = serializers.BooleanField(
+        help_text="True if this step came from the snapshot of the visit's pathway template; false for ad-hoc steps added later.",
+    )
+
     class Meta:
         model = VisitStep
         fields = [
@@ -34,6 +62,24 @@ class VisitStepSerializer(serializers.ModelSerializer):
 
 
 class VisitSerializer(serializers.ModelSerializer):
+    visit_date = serializers.DateField(help_text="Date of the visit (one visit per day).")
+    status = serializers.ChoiceField(
+        choices=Visit.Status.choices,
+        help_text="REGISTERED → IN_PROGRESS → DONE. Set by the server — callers can't write it directly.",
+    )
+    qr_token = serializers.CharField(
+        read_only=True,
+        help_text="64-char URL-safe random token, set on creation. Patients/Kiosk look up their visit by this via `GET /api/visits/by-token/{qr_token}`. Never expose `Visit.id` to patients — it's sequential and guessable.",
+    )
+    current_node = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+        help_text="Last node scanned by the patient (via location QR). Updated only by a kiosk scan.",
+    )
+    uses_wheelchair = serializers.BooleanField(
+        required=False,
+        help_text="If true, the route planner excludes edges where `wheelchair_accessible=false`.",
+    )
+
     class Meta:
         model = Visit
         fields = [

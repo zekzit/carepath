@@ -67,10 +67,36 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Hackathon API',
-    'DESCRIPTION': 'OpenAPI schema for the Hackathon backend.',
+    'TITLE': 'Hospital Wayfinding API',
+    'DESCRIPTION': (
+        "Backend API for the hospital wayfinding platform. Drives the "
+        "Admin Portal (master data, queue console, reports), the Patient "
+        "Portal (tokenless visit tracking via a per-visit `qr_token`), and "
+        "the Kiosk Portal (Phase 4).\n\n"
+        "All endpoints are currently `AllowAny` — real session login is wired "
+        "but role-based permission classes land in a later phase."
+    ),
     'VERSION': '0.1.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'CONTACT': {
+        'name': 'Hackathon team',
+        'url': 'https://github.com/anomalyco/opencode',
+    },
+    'LICENSE': {
+        'name': 'Internal — hackathon project',
+    },
+    'SERVERS': [
+        {'url': 'http://localhost:8000', 'description': 'Local development (Django runserver)'},
+        {'url': 'http://localhost:3000/api', 'description': 'Through the Next.js dev proxy'},
+    ],
+    'TAGS': [
+        {'name': 'accounts', 'description': 'Staff user authentication, master data, and audit log.'},
+        {'name': 'facility', 'description': 'Hospital map master data — buildings, floors, nodes (rooms/service points/kiosks), and graph edges between them.'},
+        {'name': 'pathway', 'description': 'Care pathways — reusable templates of ordered service-point steps that visits are instantiated from.'},
+        {'name': 'queues', 'description': 'Per-day queues per service point, the ticket lifecycle (WAITING → CALLED → SERVING → DONE), and the call-next/serve/done actions.'},
+        {'name': 'visits', 'description': 'Patient visits — register a visit, snapshot a pathway template into VisitSteps, and move each step through start/complete/skip.'},
+        {'name': 'health', 'description': 'Liveness probe.'},
+    ],
 }
 
 MIDDLEWARE = [
