@@ -1,5 +1,8 @@
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -8,7 +11,26 @@ from . import services
 from .serializers import StaffUserSerializer
 
 
+_error_with_detail = inline_serializer(
+    name="ErrorWithDetail",
+    fields={"detail": serializers.CharField()},
+)
+
+
 @ensure_csrf_cookie
+@extend_schema(
+    request=inline_serializer(
+        name="LoginRequest",
+        fields={
+            "username": serializers.CharField(),
+            "password": serializers.CharField(),
+        },
+    ),
+    responses={
+        200: StaffUserSerializer,
+        400: _error_with_detail,
+    },
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -26,6 +48,10 @@ def login_view(request):
     return Response(StaffUserSerializer(user).data)
 
 
+@extend_schema(
+    request=OpenApiTypes.NONE,
+    responses={204: OpenApiResponse(description="No content")},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def logout_view(request):
@@ -36,6 +62,12 @@ def logout_view(request):
 
 
 @ensure_csrf_cookie
+@extend_schema(
+    responses={
+        200: StaffUserSerializer,
+        401: _error_with_detail,
+    },
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def me_view(request):

@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -6,6 +8,16 @@ from rest_framework.response import Response
 from .models import Node
 
 
+@extend_schema(
+    responses=inline_serializer(
+        name="KioskResponse",
+        fields={
+            "device_code": serializers.CharField(),
+            "name_th": serializers.CharField(),
+            "name_en": serializers.CharField(),
+        },
+    ),
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def kiosk_by_device_code(request, device_code):

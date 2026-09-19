@@ -17,7 +17,7 @@ class StaffUserSerializer(serializers.ModelSerializer):
         model = StaffUser
         fields = ["id", "username", "full_name", "role"]
 
-    def get_full_name(self, obj):
+    def get_full_name(self, obj) -> str:
         return obj.get_full_name() or obj.username
 
 
@@ -67,5 +67,5 @@ class AuditLogSerializer(serializers.ModelSerializer):
         model = AuditLog
         fields = ["id", "staff_user", "staff_username", "action", "target_type", "target_id", "detail", "created_at"]
 
-    def get_staff_username(self, obj):
+    def get_staff_username(self, obj) -> str | None:
         return obj.staff_user.username if obj.staff_user else None

@@ -1,10 +1,69 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .models import Visit, VisitStep
+
+
+_service_point_payload = inline_serializer(
+    name="PublicVisitServicePoint",
+    fields={
+        "id": serializers.IntegerField(),
+        "name_th": serializers.CharField(),
+        "name_en": serializers.CharField(),
+        "department_th": serializers.CharField(),
+        "department_en": serializers.CharField(),
+    },
+)
+_visit_step_payload = inline_serializer(
+    name="PublicVisitStep",
+    fields={
+        "id": serializers.IntegerField(),
+        "sequence_order": serializers.IntegerField(),
+        "status": serializers.CharField(),
+        "prerequisite_steps": serializers.ListField(child=serializers.IntegerField()),
+        "started_at": serializers.DateTimeField(allow_null=True),
+        "completed_at": serializers.DateTimeField(allow_null=True),
+        "service_point": _service_point_payload,
+    },
+)
+_queue_ticket_payload = inline_serializer(
+    name="PublicVisitQueueTicket",
+    fields={
+        "ticket_number": serializers.IntegerField(),
+        "status": serializers.CharField(),
+        "current_number": serializers.IntegerField(),
+    },
+)
+_patient_payload = inline_serializer(
+    name="PublicVisitPatient",
+    fields={
+        "full_name": serializers.CharField(),
+        "hn_code": serializers.CharField(),
+        "preferred_language": serializers.CharField(),
+    },
+)
+public_visit_response = inline_serializer(
+    name="PublicVisitResponse",
+    fields={
+        "qr_token": serializers.CharField(),
+        "status": serializers.CharField(),
+        "visit_date": serializers.DateField(),
+        "uses_wheelchair": serializers.BooleanField(),
+        "patient": _patient_payload,
+        "steps": serializers.ListField(child=_visit_step_payload),
+        "next_step": _visit_step_payload,
+        "queue_ticket": _queue_ticket_payload,
+    },
+)
+_not_found_response = inline_serializer(
+    name="PublicVisitNotFound",
+    fields={"detail": serializers.CharField()},
+)
 
 
 def serialize_public_visit(visit: Visit) -> dict:
@@ -79,6 +138,7 @@ def serialize_public_visit(visit: Visit) -> dict:
     }
 
 
+@extend_schema(responses={200: public_visit_response, 404: _not_found_response})
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def visit_by_token(request, qr_token):
@@ -90,6 +150,7 @@ def visit_by_token(request, qr_token):
     return Response(serialize_public_visit(visit))
 
 
+@extend_schema(responses={200: public_visit_response, 404: _not_found_response})
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def visit_by_hn_today(request, hn_code):
