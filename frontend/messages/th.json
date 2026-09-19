@@ -383,7 +383,18 @@
     "manualEntrySearching": "กำลังค้นหา...",
     "manualEntrySubmit": "ค้นหา",
     "locationNotFound": "ไม่พบจุดนี้ กรุณาตรวจสอบรหัสแล้วลองใหม่",
-    "closeScannerCta": "ปิด"
+    "closeScannerCta": "ปิด",
+    "route": {
+      "title": "คำแนะนำการเดินทางแบบทีละขั้น",
+      "straight": "เดินตรงไป {distance} ม.",
+      "turnLeft": "เลี้ยวซ้าย เดินต่อ {distance} ม.",
+      "turnRight": "เลี้ยวขวา เดินต่อ {distance} ม.",
+      "elevator": "ขึ้น/ลงลิฟต์ไปชั้น {floor}",
+      "stairs": "เดินขึ้น/ลงบันไดไปชั้น {floor}",
+      "summary": "รวม {distance} ม. · ประมาณ {time}",
+      "timeMinutes": "{value} นาที",
+      "timeSeconds": "{value} วินาที"
+    }
   },
   "kiosk": {
     "deviceLabel": "จุดคัดกรอง A · Kiosk {code}",

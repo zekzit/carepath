@@ -200,7 +200,12 @@ function ResultScreen({ kiosk, visit, onReset }: { kiosk: KioskInfo; visit: Publ
 
       <div className="flex flex-1 flex-col gap-3.5 overflow-auto bg-[var(--surface-app)] p-[18px]">
         {visit.next_steps.length > 0 && (
-          <NextStepOptionsList options={visit.next_steps} origin={kiosk} variant="kiosk" />
+          <NextStepOptionsList
+            options={visit.next_steps}
+            origin={kiosk}
+            variant="kiosk"
+            wheelchair={visit.uses_wheelchair}
+          />
         )}
 
         <div className="flex-1" />

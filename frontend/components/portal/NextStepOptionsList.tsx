@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { AppLocale } from "@/i18n/locales";
 import type { PublicVisitNextStepOption } from "@/lib/api/public-visit";
@@ -8,6 +9,7 @@ import { computeDirection, type NodePosition } from "@/lib/direction";
 import { DirectionBlock } from "./DirectionBlock";
 import { NextStepCard } from "./NextStepCard";
 import { QueueWidget } from "./QueueWidget";
+import { RouteInstructions } from "./RouteInstructions";
 
 // Renders the patient's eligible next-step options for both the Patient
 // Portal and the Kiosk Portal. Two layouts:
@@ -30,28 +32,38 @@ import { QueueWidget } from "./QueueWidget";
 
 type Variant = "patient" | "kiosk";
 
+// `origin` needs a Node id (not just floor-plan position) to call the
+// routing endpoint — both LocationNodeInfo (patient's scanned location) and
+// KioskInfo (the kiosk's own node) carry one, so this narrows NodePosition
+// with that requirement rather than introducing a whole new shape.
+type RouteOrigin = NodePosition & { id: number };
+
 export function NextStepOptionsList({
   options,
   origin,
   variant,
+  wheelchair,
 }: {
   options: PublicVisitNextStepOption[];
-  origin: NodePosition | null;
+  origin: RouteOrigin | null;
   variant: Variant;
+  /** From `visit.uses_wheelchair` — passed through to the routing engine so
+   * wheelchair patients automatically get a stairs-avoiding route (FR-17). */
+  wheelchair: boolean;
 }) {
   if (options.length === 0) return null;
 
   // Single-option case: keep the original layout so neither portal
   // visually regresses for the >99% of visits where the path is linear.
   if (options.length === 1) {
-    return <SingleOption option={options[0]} origin={origin} variant={variant} />;
+    return <SingleOption option={options[0]} origin={origin} variant={variant} wheelchair={wheelchair} />;
   }
 
   return (
     <div className="flex flex-col gap-3">
       <ParallelHeader count={options.length} />
       {options.map((option) => (
-        <ParallelOptionCard key={option.id} option={option} origin={origin} variant={variant} />
+        <ParallelOptionCard key={option.id} option={option} origin={origin} variant={variant} wheelchair={wheelchair} />
       ))}
     </div>
   );
@@ -61,14 +73,21 @@ function SingleOption({
   option,
   origin,
   variant,
+  wheelchair,
 }: {
   option: PublicVisitNextStepOption;
-  origin: NodePosition | null;
+  origin: RouteOrigin | null;
   variant: Variant;
+  wheelchair: boolean;
 }) {
   const scale: "default" | "kiosk" = variant === "kiosk" ? "kiosk" : "default";
   const locale = useLocale() as AppLocale;
   const direction = origin ? computeDirection(origin, option.service_point) : null;
+  // Once the routing engine returns a real turn-by-turn route, it becomes
+  // the primary content and the straight-line compass fallback is hidden —
+  // the compass stays as graceful degradation for when no route data is
+  // available (offline, or the graph genuinely has no path).
+  const [routeAvailable, setRouteAvailable] = useState(false);
   // DirectionBlock's default title is kiosk copy ("Direction from kiosk") —
   // the Patient Portal overrides it with patient-specific copy ("Direction
   // from where you stand") since the origin is the patient's scanned
@@ -79,7 +98,16 @@ function SingleOption({
 
   return (
     <>
-      {direction && (
+      {origin && (
+        <RouteInstructions
+          originNodeId={origin.id}
+          destinationNodeId={option.service_point.id}
+          wheelchair={wheelchair}
+          scale={scale}
+          onRouteAvailable={setRouteAvailable}
+        />
+      )}
+      {direction && !routeAvailable && (
         <DirectionBlock
           direction={direction}
           destination={option.service_point}
@@ -112,10 +140,12 @@ function ParallelOptionCard({
   option,
   origin,
   variant,
+  wheelchair,
 }: {
   option: PublicVisitNextStepOption;
-  origin: NodePosition | null;
+  origin: RouteOrigin | null;
   variant: Variant;
+  wheelchair: boolean;
 }) {
   const t = useTranslations("patient");
   const locale = useLocale() as AppLocale;
@@ -123,6 +153,7 @@ function ParallelOptionCard({
   const location = serviceStepLocationName(option, locale);
   const floorName = locale === "th" ? option.service_point.floor_name_th : option.service_point.floor_name_en;
   const direction = origin ? computeDirection(origin, option.service_point) : null;
+  const [routeAvailable, setRouteAvailable] = useState(false);
 
   const containerPadding = isKiosk ? "p-[18px]" : "p-4";
   const titleSize = isKiosk ? "text-[16px]" : "text-[15px]";
@@ -130,9 +161,11 @@ function ParallelOptionCard({
 
   // Bearing text — mirrors DirectionBlock's three states (different floor,
   // at point, normal) so the per-option card carries the same info the
-  // single-option DirectionBlock does, just without the SVG compass.
+  // single-option DirectionBlock does, just without the SVG compass. Hidden
+  // once a real turn-by-turn route is available (below) — that becomes the
+  // primary content, this stays only as the graceful-degradation fallback.
   const bearingText = (() => {
-    if (!direction) return null;
+    if (!direction || routeAvailable) return null;
     if (!direction.same_floor) {
       return { label: `→ ${floorName}`, color: "text-[#9fc4be]" };
     }
@@ -158,6 +191,15 @@ function ParallelOptionCard({
         </div>
         {bearingText && <div className={`shrink-0 ${titleSize} font-bold ${bearingText.color}`}>{bearingText.label}</div>}
       </div>
+      {origin && (
+        <RouteInstructions
+          originNodeId={origin.id}
+          destinationNodeId={option.service_point.id}
+          wheelchair={wheelchair}
+          scale={isKiosk ? "kiosk" : "default"}
+          onRouteAvailable={setRouteAvailable}
+        />
+      )}
       {ticket ? (
         <div className={`flex items-center justify-between ${metaSize}`}>
           <div className="text-[#9fc4be]">{t("queueTitleAt", { location })}</div>

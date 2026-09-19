@@ -161,6 +161,11 @@ const DEMO_VISIT: PublicVisit = {
 // direction (e.g. "head SE to the lab"). Real kiosks come from the
 // backend; this only kicks in when no Node with that device_code exists.
 const FALLBACK_KIOSK: KioskInfo = {
+  // No real Node backs this demo fallback, so there's no real routing-engine
+  // id to use — 0 never matches a real Node, so RouteInstructions' fetch
+  // just resolves to "no route" and the UI falls back to the compass, which
+  // still works fine from the pos_x/pos_y/floor_* fields below.
+  id: 0,
   device_code: "DEMO",
   name_th: "คีออสก์สาธิต",
   name_en: "Demo kiosk",

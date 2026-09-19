@@ -383,7 +383,18 @@
     "manualEntrySearching": "Searching...",
     "manualEntrySubmit": "Look up",
     "locationNotFound": "No location matches that code — please check and try again.",
-    "closeScannerCta": "Close"
+    "closeScannerCta": "Close",
+    "route": {
+      "title": "Turn-by-turn directions",
+      "straight": "Go straight for {distance} m.",
+      "turnLeft": "Turn left, continue {distance} m.",
+      "turnRight": "Turn right, continue {distance} m.",
+      "elevator": "Take the elevator to {floor}",
+      "stairs": "Take the stairs to {floor}",
+      "summary": "Total {distance} m · about {time}",
+      "timeMinutes": "{value} min",
+      "timeSeconds": "{value} sec"
+    }
   },
   "kiosk": {
     "deviceLabel": "Screening Point A · Kiosk {code}",

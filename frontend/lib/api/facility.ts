@@ -5,6 +5,9 @@ import { createResourceClient } from "./resource";
 // straight-line bearing from the kiosk to the patient's next service point.
 // Mirrors `backend/facility/views.py::kiosk_by_device_code`.
 export type KioskInfo = {
+  // The kiosk's own Node id — used as the routing engine's origin node
+  // (see fetchRouteClient below / RouteInstructions.tsx).
+  id: number;
   device_code: string;
   name_th: string;
   name_en: string;
@@ -145,4 +148,53 @@ export function uploadFloorPlanImage(floorId: number, file: File): Promise<Floor
   const formData = new FormData();
   formData.append("plan_image", file);
   return apiFetch<Floor>(`/facility/floors/${floorId}`, { method: "PATCH", body: formData });
+}
+
+// FR-13/FR-12/FR-17: real shortest-path routing over the facility graph —
+// replaces the straight-line-only compass bearing in lib/direction.ts.
+// Mirrors `backend/facility/views.py::route_between_nodes` /
+// `backend/facility/routing.py::RouteLeg`/`RouteResult`.
+export type RouteLeg = {
+  from_node_id: number;
+  to_node_id: number;
+  edge_type: EdgeType;
+  distance_m: number;
+  walk_time_sec: number;
+  turn: "LEFT" | "RIGHT" | "STRAIGHT" | null;
+  to_floor_id: number;
+  to_floor_name_th: string;
+  to_floor_name_en: string;
+};
+
+export type RouteResult = {
+  reachable: boolean;
+  total_distance_m: number;
+  total_time_sec: number;
+  legs: RouteLeg[];
+};
+
+/**
+ * Client-only — used by RouteInstructions.tsx to fetch turn-by-turn
+ * directions for the Patient Portal / Kiosk. Goes through the same-origin
+ * `/api/*` rewrite proxy, and never throws: any non-2xx (400 bad node ids)
+ * or network hiccup just returns null so the caller can fall back to the
+ * compass-only DirectionBlock — same contract as fetchLocationNodeByQrClient.
+ */
+export async function fetchRouteClient(
+  fromNodeId: number,
+  toNodeId: number,
+  wheelchair: boolean,
+): Promise<RouteResult | null> {
+  try {
+    const params = new URLSearchParams({
+      from_node: String(fromNodeId),
+      to_node: String(toNodeId),
+      wheelchair: wheelchair ? "true" : "false",
+    });
+    const res = await fetch(`/api/facility/route?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }

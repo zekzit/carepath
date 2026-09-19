@@ -75,7 +75,12 @@ function PatientPortalBody({ token, initialVisit }: { token: string; initialVisi
         </div>
 
         {visit.next_steps.length > 0 ? (
-          <NextStepOptionsList options={visit.next_steps} origin={currentLocation} variant="patient" />
+          <NextStepOptionsList
+            options={visit.next_steps}
+            origin={currentLocation}
+            variant="patient"
+            wheelchair={visit.uses_wheelchair}
+          />
         ) : (
           <VisitCompleteCard />
         )}
