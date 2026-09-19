@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-90sk^6l1h+xf1t14c93x*iuekzg8u-+eh5jesdo7bii&p5avtu
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'khal.tortoise-theropod.ts.net']
 
 # Next.js rewrites (used to serve the API from the same origin as the
 # frontend) drop the trailing slash from wildcard path segments, so API
@@ -124,6 +124,7 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://khal.tortoise-theropod.ts.net',
 ]
 
 ROOT_URLCONF = 'config.urls'

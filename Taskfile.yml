@@ -6,6 +6,7 @@ tasks:
     deps:
       - dev:backend
       - dev:frontend
+      - dev:funnel
 
   dev:backend:
     internal: true
@@ -18,3 +19,8 @@ tasks:
     dir: frontend
     cmds:
       - npm run dev
+
+  dev:funnel:
+    desc: Expose the frontend dev server on port 3000 via tailscale funnel
+    cmds:
+      - tailscale funnel 3000

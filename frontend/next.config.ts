@@ -4,7 +4,7 @@ import createNextIntlPlugin from "next-intl/plugin";
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["localhost", "127.0.0.1"],
+  allowedDevOrigins: ["localhost", "127.0.0.1", "khal.tortoise-theropod.ts.net"],
   skipTrailingSlashRedirect: true,
   async rewrites() {
     return [
