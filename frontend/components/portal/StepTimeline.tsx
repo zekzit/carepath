@@ -6,6 +6,13 @@ import { CheckCircleIcon, ClockIcon, XIcon } from "@/components/icons";
 
 type Scale = "default" | "kiosk";
 
+// A step's dot/status can be a designated-next PENDING step ("ELIGIBLE" —
+// SRS Flow Diagram: ฟ้า/blue = รอดำเนินการ, จุดถัดไปที่เจ้าหน้าที่ระบุให้ไป),
+// distinct from a plain not-yet-eligible grey PENDING one. Not part of
+// PublicVisitStepStatus itself (that's the raw backend status) — this is a
+// derived display-only status.
+type DisplayStatus = PublicVisitStepStatus | "ELIGIBLE";
+
 function formatCompletedAt(iso: string | null, locale: AppLocale): string {
   if (!iso) return "";
   return new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
@@ -42,11 +49,13 @@ export function StepTimeline({ steps, scale = "default" }: { steps: PublicVisitS
         // do (DONE or SKIPPED) — a lone SKIPPED prerequisite still does NOT
         // count as satisfied for the *next* group (that rule lives in the
         // backend's own eligibility check, not here).
-        const groupStatus: PublicVisitStepStatus = group.some((s) => s.status === "IN_PROGRESS")
+        const groupStatus: DisplayStatus = group.some((s) => s.status === "IN_PROGRESS")
           ? "IN_PROGRESS"
           : group.every((s) => s.status === "DONE" || s.status === "SKIPPED")
             ? "DONE"
-            : "PENDING";
+            : group.some((s) => s.status === "PENDING" && s.is_next)
+              ? "ELIGIBLE"
+              : "PENDING";
 
         return (
           <div key={group.map((s) => s.id).join("-")} className="flex gap-2.5">
@@ -65,7 +74,9 @@ export function StepTimeline({ steps, scale = "default" }: { steps: PublicVisitS
               <div className="pb-3.5">
                 <div
                   className={`${titleSize} font-semibold ${
-                    group[0].status === "PENDING" || group[0].status === "SKIPPED" ? "text-[var(--ink-muted)]" : ""
+                    (group[0].status === "PENDING" && !group[0].is_next) || group[0].status === "SKIPPED"
+                      ? "text-[var(--ink-muted)]"
+                      : ""
                   }`}
                 >
                   {serviceStepLocationName(group[0], locale)}
@@ -73,7 +84,7 @@ export function StepTimeline({ steps, scale = "default" }: { steps: PublicVisitS
                 <div className={`${metaSize} text-[var(--ink-faint)]`}>
                   {group[0].status === "DONE" && `${t("stepDone")} · ${formatCompletedAt(group[0].completed_at, locale)}`}
                   {group[0].status === "IN_PROGRESS" && t("stepInProgress")}
-                  {group[0].status === "PENDING" && t("waitingPrereq")}
+                  {group[0].status === "PENDING" && (group[0].is_next ? t("stepEligible") : t("waitingPrereq"))}
                   {group[0].status === "SKIPPED" && t("stepSkipped")}
                 </div>
               </div>
@@ -85,7 +96,7 @@ export function StepTimeline({ steps, scale = "default" }: { steps: PublicVisitS
   );
 }
 
-function StepDot({ status, className }: { status: PublicVisitStepStatus; className: string }) {
+function StepDot({ status, className }: { status: DisplayStatus; className: string }) {
   if (status === "DONE") {
     return (
       <div className={`flex shrink-0 items-center justify-center rounded-full bg-[var(--brand-teal)] ${className}`}>
@@ -106,6 +117,10 @@ function StepDot({ status, className }: { status: PublicVisitStepStatus; classNa
         <ClockIcon width="60%" height="60%" stroke="#fff" strokeWidth={2.4} />
       </div>
     );
+  }
+  if (status === "ELIGIBLE") {
+    // Staff-designated next step, still PENDING — SRS blue (ฟ้า).
+    return <div className={`shrink-0 rounded-full bg-[var(--brand-blue)] ${className}`} />;
   }
   return <div className={`shrink-0 rounded-full bg-[var(--border-subtle)] ${className}`} />;
 }
@@ -145,6 +160,17 @@ function ParallelStepCard({ step, scale }: { step: PublicVisitStep; scale: Scale
       </div>
     );
   }
+  if (step.is_next) {
+    // Staff-designated next step, still PENDING — SRS blue (ฟ้า), distinct
+    // from a plain not-yet-eligible grey parallel sibling below.
+    return (
+      <div className={`mb-2 rounded-[10px] border border-[var(--brand-blue)]/40 bg-[var(--brand-blue)]/10 ${padding}`}>
+        <div className={`${titleSize} font-semibold text-[var(--ink)]`}>{name}</div>
+        <div className={`${metaSize} text-[var(--ink-faint)]`}>{t("stepEligible")}</div>
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-app)] ${padding}`}>
       <div className={`${titleSize} font-semibold text-[var(--ink-muted)]`}>{name}</div>

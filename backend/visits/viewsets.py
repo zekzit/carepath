@@ -1,17 +1,105 @@
+from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
+from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.models import StaffUser
 from accounts.permissions import RoleRequired
 from accounts.services import log_action
-from queues.services import ensure_ticket_for_step
+from facility.models import Node
+from queues.services import ensure_ticket_for_step, waiting_count_for_service_point
 
 from . import services
 from .models import Patient, Visit, VisitStep
 from .serializers import PatientSerializer, VisitSerializer, VisitStepSerializer
+
+
+def _eligible_next_steps(visit, completing_or_skipping_step):
+    """PENDING VisitSteps in `visit` (other than the step itself) that would
+    become eligible once `completing_or_skipping_step` is counted as
+    resolved — i.e. every one of their `prerequisite_steps` is either
+    already DONE, or IS `completing_or_skipping_step`. Shared by
+    complete/skip's 409-preview + `next_step_ids` designation mechanism
+    (GAP.md FR-19/FR-21) so the two actions don't duplicate this logic."""
+    candidates = (
+        visit.steps.filter(status=VisitStep.Status.PENDING)
+        .exclude(id=completing_or_skipping_step.id)
+        .select_related("service_point")
+        .prefetch_related("prerequisite_steps")
+    )
+    eligible = []
+    for candidate in candidates:
+        prereqs = list(candidate.prerequisite_steps.all())
+        if all(
+            p.id == completing_or_skipping_step.id or p.status == VisitStep.Status.DONE
+            for p in prereqs
+        ):
+            eligible.append(candidate)
+    return eligible
+
+
+def _eligible_next_steps_payload(eligible_next):
+    """Body for the 409 "designate next step(s)" preview response."""
+    return {
+        "detail": (
+            "This step unlocks one or more follow-up steps — specify "
+            "next_step_ids to designate which the patient goes to next."
+        ),
+        "eligible_next_steps": [
+            {
+                "id": s.id,
+                "service_point": {
+                    "id": s.service_point_id,
+                    "name_th": s.service_point.name_th,
+                    "name_en": s.service_point.name_en,
+                },
+                "waiting_count": waiting_count_for_service_point(s.service_point),
+            }
+            for s in eligible_next
+        ],
+    }
+
+
+_eligible_next_step_option_schema = inline_serializer(
+    name="EligibleNextStepOption",
+    fields={
+        "id": serializers.IntegerField(),
+        "service_point": inline_serializer(
+            name="EligibleNextStepServicePoint",
+            fields={
+                "id": serializers.IntegerField(),
+                "name_th": serializers.CharField(),
+                "name_en": serializers.CharField(),
+            },
+        ),
+        "waiting_count": serializers.IntegerField(),
+    },
+)
+_designation_required_response_schema = inline_serializer(
+    name="DesignationRequiredResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "eligible_next_steps": serializers.ListField(child=_eligible_next_step_option_schema),
+    },
+)
+_next_step_ids_request_schema = inline_serializer(
+    name="CompleteOrSkipVisitStepRequest",
+    fields={
+        "next_step_ids": serializers.ListField(
+            child=serializers.IntegerField(),
+            required=False,
+            help_text=(
+                "Ids of the eligible-next VisitSteps (from a prior 409's "
+                "eligible_next_steps) that staff designates as where the "
+                "patient goes next. Omit to get the 409 preview when this "
+                "action would unlock one or more follow-up steps."
+            ),
+        ),
+    },
+)
 
 
 @extend_schema_view(
@@ -84,29 +172,59 @@ class VisitViewSet(viewsets.ModelViewSet):
     start=extend_schema(
         summary="Start a visit step",
         description=(
-            "Allowed only from `PENDING`. 400 if any prerequisite step is "
-            "not `DONE` (a `SKIPPED` one does not count — see MODELS.md § 3). "
-            "On success: step → `IN_PROGRESS`, the parent visit transitions "
-            "to `IN_PROGRESS` if it was `REGISTERED`, and a `QueueTicket` is "
-            "ensured at the step's service point."
+            "Allowed only from `PENDING` AND `is_next=True` — i.e. staff "
+            "must have already designated this step as where the patient "
+            "goes next (see the `complete`/`skip` actions' `next_step_ids`, "
+            "or the pathway's root step(s), auto-designated at registration). "
+            "400 if not `PENDING`, 400 if not designated (`is_next=False`), "
+            "and 400 if any prerequisite step is not `DONE` (a `SKIPPED` one "
+            "does not count — see MODELS.md § 3; kept as defense in depth "
+            "even though `is_next` is only ever set once prerequisites are "
+            "already satisfied). On success: step → `IN_PROGRESS`, the "
+            "parent visit transitions to `IN_PROGRESS` if it was "
+            "`REGISTERED`, and a `QueueTicket` is ensured at the step's "
+            "service point."
         ),
         request=None,
-        responses={200: VisitStepSerializer, 400: {"description": "Step is not PENDING or has unmet prerequisites."}},
+        responses={
+            200: VisitStepSerializer,
+            400: {"description": "Step is not PENDING, not staff-designated (is_next=False), or has unmet prerequisites."},
+        },
     ),
     complete=extend_schema(
         summary="Complete a visit step",
-        description="Allowed only from `IN_PROGRESS`. Delegates to `visits.services.complete_step`.",
-        request=None,
-        responses={200: VisitStepSerializer, 400: {"description": "Step is not IN_PROGRESS."}},
+        description=(
+            "Allowed only from `IN_PROGRESS`. If completing this step would "
+            "unlock one or more follow-up PENDING steps (all their other "
+            "prerequisites already DONE) and the request did not include "
+            "`next_step_ids`, returns 409 with the list of eligible options "
+            "(and each target service point's current queue length) instead "
+            "of completing anything. Pass `next_step_ids` (a subset of that "
+            "list) to complete the step AND designate exactly those as "
+            "`is_next=True`. Delegates to `visits.services.complete_step`."
+        ),
+        request=_next_step_ids_request_schema,
+        responses={
+            200: VisitStepSerializer,
+            400: {"description": "Step is not IN_PROGRESS, or next_step_ids contains an invalid/ineligible id."},
+            409: _designation_required_response_schema,
+        },
     ),
     skip=extend_schema(
         summary="Skip a visit step",
         description=(
             "Allowed from `PENDING` or `IN_PROGRESS`. 400 if already `DONE` "
-            "or `SKIPPED`. Delegates to `visits.services.skip_step`."
+            "or `SKIPPED`. Same `next_step_ids` / 409-preview designation "
+            "mechanism as `complete` — skipping a step can unlock follow-up "
+            "steps just like completing one does. Delegates to "
+            "`visits.services.skip_step`."
         ),
-        request=None,
-        responses={200: VisitStepSerializer, 400: {"description": "Step is already DONE or SKIPPED."}},
+        request=_next_step_ids_request_schema,
+        responses={
+            200: VisitStepSerializer,
+            400: {"description": "Step is already DONE or SKIPPED, or next_step_ids contains an invalid/ineligible id."},
+            409: _designation_required_response_schema,
+        },
     ),
 )
 class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
@@ -130,20 +248,31 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         summary="Start a visit step",
         description=(
-            "Allowed only from `PENDING`. 400 if any prerequisite step is "
-            "not `DONE` (a `SKIPPED` one does not count — see MODELS.md § 3). "
-            "On success: step → `IN_PROGRESS`, the parent visit transitions "
-            "to `IN_PROGRESS` if it was `REGISTERED`, and a `QueueTicket` is "
+            "Allowed only from `PENDING` AND `is_next=True` — staff must "
+            "have already designated this step as where the patient goes "
+            "next. 400 if not `PENDING`, 400 if not designated, and 400 if "
+            "any prerequisite step is not `DONE` (a `SKIPPED` one does not "
+            "count — see MODELS.md § 3; kept as defense in depth). On "
+            "success: step → `IN_PROGRESS`, the parent visit transitions to "
+            "`IN_PROGRESS` if it was `REGISTERED`, and a `QueueTicket` is "
             "ensured at the step's service point."
         ),
         request=None,
-        responses={200: VisitStepSerializer, 400: {"description": "Step is not PENDING or has unmet prerequisites."}},
+        responses={
+            200: VisitStepSerializer,
+            400: {"description": "Step is not PENDING, not staff-designated (is_next=False), or has unmet prerequisites."},
+        },
     )
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         step = self.get_object()
         if step.status != VisitStep.Status.PENDING:
             return Response({"detail": f"Step is {step.status}, not PENDING."}, status=400)
+
+        if not step.is_next:
+            return Response(
+                {"detail": "This step has not been designated as the next step by staff yet."}, status=400
+            )
 
         unmet = step.prerequisite_steps.exclude(status=VisitStep.Status.DONE)
         if unmet.exists():
@@ -165,35 +294,224 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         summary="Complete a visit step",
-        description="Allowed only from `IN_PROGRESS`. Delegates to `visits.services.complete_step`.",
-        request=None,
-        responses={200: VisitStepSerializer, 400: {"description": "Step is not IN_PROGRESS."}},
+        description=(
+            "Allowed only from `IN_PROGRESS`. If completing this step would "
+            "unlock one or more follow-up PENDING steps and the request did "
+            "not include `next_step_ids`, returns 409 with the eligible "
+            "options instead of completing anything. Pass `next_step_ids` "
+            "to complete AND designate exactly those as `is_next=True`. "
+            "Delegates to `visits.services.complete_step`."
+        ),
+        request=_next_step_ids_request_schema,
+        responses={
+            200: VisitStepSerializer,
+            400: {"description": "Step is not IN_PROGRESS, or next_step_ids contains an invalid/ineligible id."},
+            409: _designation_required_response_schema,
+        },
     )
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         step = self.get_object()
         if step.status != VisitStep.Status.IN_PROGRESS:
             return Response({"detail": f"Step is {step.status}, not IN_PROGRESS."}, status=400)
+
+        eligible_next = _eligible_next_steps(step.visit, step)
+        next_step_ids = request.data.get("next_step_ids")
+
+        if eligible_next and next_step_ids is None:
+            return Response(_eligible_next_steps_payload(eligible_next), status=409)
+
+        if next_step_ids is not None:
+            eligible_ids = {s.id for s in eligible_next}
+            invalid = [nid for nid in next_step_ids if nid not in eligible_ids]
+            if invalid:
+                return Response(
+                    {"detail": f"next_step_ids contains ids that are not eligible next steps for this visit: {invalid}"},
+                    status=400,
+                )
+
         services.complete_step(step)
         step.refresh_from_db()
-        log_action(request.user, "COMPLETE_VISIT_STEP", "VisitStep", step.id, {"visit": step.visit_id})
+
+        if next_step_ids:
+            VisitStep.objects.filter(id__in=next_step_ids).update(is_next=True)
+
+        log_action(
+            request.user,
+            "COMPLETE_VISIT_STEP",
+            "VisitStep",
+            step.id,
+            {"visit": step.visit_id, "next_step_ids": next_step_ids},
+        )
         return Response(VisitStepSerializer(step).data)
 
     @extend_schema(
         summary="Skip a visit step",
         description=(
             "Allowed from `PENDING` or `IN_PROGRESS`. 400 if already `DONE` "
-            "or `SKIPPED`. Delegates to `visits.services.skip_step`."
+            "or `SKIPPED`. Same `next_step_ids` / 409-preview designation "
+            "mechanism as `complete` — skipping a step can unlock follow-up "
+            "steps just like completing one does. Delegates to "
+            "`visits.services.skip_step`."
         ),
-        request=None,
-        responses={200: VisitStepSerializer, 400: {"description": "Step is already DONE or SKIPPED."}},
+        request=_next_step_ids_request_schema,
+        responses={
+            200: VisitStepSerializer,
+            400: {"description": "Step is already DONE or SKIPPED, or next_step_ids contains an invalid/ineligible id."},
+            409: _designation_required_response_schema,
+        },
     )
     @action(detail=True, methods=["post"])
     def skip(self, request, pk=None):
         step = self.get_object()
         if step.status in (VisitStep.Status.DONE, VisitStep.Status.SKIPPED):
             return Response({"detail": f"Step is already {step.status}."}, status=400)
+
+        eligible_next = _eligible_next_steps(step.visit, step)
+        next_step_ids = request.data.get("next_step_ids")
+
+        if eligible_next and next_step_ids is None:
+            return Response(_eligible_next_steps_payload(eligible_next), status=409)
+
+        if next_step_ids is not None:
+            eligible_ids = {s.id for s in eligible_next}
+            invalid = [nid for nid in next_step_ids if nid not in eligible_ids]
+            if invalid:
+                return Response(
+                    {"detail": f"next_step_ids contains ids that are not eligible next steps for this visit: {invalid}"},
+                    status=400,
+                )
+
         services.skip_step(step)
         step.refresh_from_db()
-        log_action(request.user, "SKIP_VISIT_STEP", "VisitStep", step.id, {"visit": step.visit_id})
+
+        if next_step_ids:
+            VisitStep.objects.filter(id__in=next_step_ids).update(is_next=True)
+
+        log_action(
+            request.user,
+            "SKIP_VISIT_STEP",
+            "VisitStep",
+            step.id,
+            {"visit": step.visit_id, "next_step_ids": next_step_ids},
+        )
         return Response(VisitStepSerializer(step).data)
+
+    @extend_schema(
+        summary="Insert an unplanned (ad-hoc) step mid-visit",
+        description=(
+            "Staff, standing at their own current VisitStep (`{id}` — "
+            "typically `IN_PROGRESS`, but not required to be), inserts a "
+            "new ad-hoc (`is_planned=False`) VisitStep at `service_point` "
+            "for the same visit (e.g. a doctor ordering an extra chest "
+            "X-ray mid-consult). The new step's sole prerequisite is `{id}`'s "
+            "step. Every step named in `insert_before_step_ids` additionally "
+            "gets the new step ADDED to its existing prerequisites (never "
+            "replacing them), so existing ordering is only tightened, never "
+            "broken. `sequence_order` for every other step in the visit at "
+            "or after the insertion point is bumped by 1 for display "
+            "purposes only — `prerequisite_steps` is what actually enforces "
+            "ordering. The new step starts with `is_next=False`; it becomes "
+            "designable the moment `{id}`'s step is completed/skipped, via "
+            "that action's `next_step_ids` mechanism, with no special-case "
+            "wiring needed. See GAP.md FR-20."
+        ),
+        request=inline_serializer(
+            name="InsertNextStepRequest",
+            fields={
+                "service_point": serializers.IntegerField(
+                    help_text="Node id of the target service point — must be node_type=SERVICE_POINT."
+                ),
+                "insert_before_step_ids": serializers.ListField(
+                    child=serializers.IntegerField(),
+                    required=False,
+                    help_text="VisitStep ids (same visit) to add the new step as an extra prerequisite of. Defaults to [].",
+                ),
+            },
+        ),
+        responses={
+            201: inline_serializer(
+                name="InsertNextStepResponse",
+                fields={
+                    "id": serializers.IntegerField(),
+                    "visit": serializers.IntegerField(),
+                    "service_point": serializers.IntegerField(),
+                    "sequence_order": serializers.IntegerField(),
+                    "prerequisite_steps": serializers.ListField(child=serializers.IntegerField()),
+                    "status": serializers.CharField(),
+                    "is_planned": serializers.BooleanField(),
+                    "is_next": serializers.BooleanField(),
+                    "started_at": serializers.DateTimeField(allow_null=True),
+                    "completed_at": serializers.DateTimeField(allow_null=True),
+                    "target_queue_waiting_count": serializers.IntegerField(
+                        help_text="waiting_count_for_service_point(service_point) at insertion time."
+                    ),
+                },
+            ),
+            400: {
+                "description": (
+                    "service_point is not an existing SERVICE_POINT node, or "
+                    "insert_before_step_ids references an unknown id or a "
+                    "VisitStep from a different visit."
+                )
+            },
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="insert-next")
+    def insert_next(self, request, pk=None):
+        current_step = self.get_object()
+        visit = current_step.visit
+
+        service_point_id = request.data.get("service_point")
+        node = Node.objects.filter(id=service_point_id).first()
+        if node is None or node.node_type != Node.NodeType.SERVICE_POINT:
+            return Response(
+                {"detail": "service_point must be the id of an existing SERVICE_POINT node."}, status=400
+            )
+
+        insert_before_step_ids = request.data.get("insert_before_step_ids") or []
+        insert_before_steps = list(VisitStep.objects.filter(id__in=insert_before_step_ids))
+        found_ids = {s.id for s in insert_before_steps}
+        missing = [sid for sid in insert_before_step_ids if sid not in found_ids]
+        if missing:
+            return Response(
+                {"detail": f"insert_before_step_ids references unknown VisitStep ids: {missing}"}, status=400
+            )
+        cross_visit = [s.id for s in insert_before_steps if s.visit_id != visit.id]
+        if cross_visit:
+            return Response(
+                {"detail": f"insert_before_step_ids must belong to the same visit as this step: {cross_visit}"},
+                status=400,
+            )
+
+        with transaction.atomic():
+            new_sequence_order = current_step.sequence_order + 1
+            VisitStep.objects.filter(visit=visit, sequence_order__gte=new_sequence_order).update(
+                sequence_order=F("sequence_order") + 1
+            )
+            new_step = VisitStep.objects.create(
+                visit=visit,
+                service_point=node,
+                sequence_order=new_sequence_order,
+                is_planned=False,
+            )
+            new_step.prerequisite_steps.set([current_step])
+
+            for target in insert_before_steps:
+                target.prerequisite_steps.add(new_step)
+
+            log_action(
+                request.user,
+                "INSERT_VISIT_STEP",
+                "VisitStep",
+                new_step.id,
+                {
+                    "visit": visit.id,
+                    "service_point": node.id,
+                    "insert_before_step_ids": insert_before_step_ids,
+                },
+            )
+
+        data = VisitStepSerializer(new_step).data
+        data["target_queue_waiting_count"] = waiting_count_for_service_point(node)
+        return Response(data, status=201)

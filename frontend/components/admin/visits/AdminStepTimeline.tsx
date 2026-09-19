@@ -26,12 +26,12 @@ function groupBySequence(steps: VisitStep[]): VisitStep[][] {
   return [...groups.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
 }
 
-/** A step may start once it's PENDING and every one of its prerequisites (looked
- * up within this same visit's step list) is DONE — a SKIPPED prerequisite does
- * NOT count, per MODELS.md and the backend's tested `start` action. */
-function canStart(step: VisitStep, allSteps: VisitStep[]): boolean {
-  if (step.status !== "PENDING") return false;
-  return step.prerequisite_steps.every((prereqId) => allSteps.find((s) => s.id === prereqId)?.status === "DONE");
+/** A step may start once it's PENDING AND staff has designated it as the
+ * next step (`is_next`) — the backend is now the source of truth for this
+ * (see visits/viewsets.py::VisitStepViewSet.start), so eligibility is no
+ * longer re-derived here from prerequisite_steps. */
+function canStart(step: VisitStep): boolean {
+  return step.status === "PENDING" && step.is_next;
 }
 
 function canComplete(step: VisitStep): boolean {
@@ -95,7 +95,6 @@ export function AdminStepTimeline({
                 <StepCard
                   key={step.id}
                   step={step}
-                  allSteps={steps}
                   servicePointLabel={servicePointLabel}
                   busy={busyStepId === step.id}
                   onStart={() => onStart(step.id)}
@@ -132,7 +131,6 @@ function StepDot({ status }: { status: GroupStatus }) {
 
 function StepCard({
   step,
-  allSteps,
   servicePointLabel,
   busy,
   onStart,
@@ -140,7 +138,6 @@ function StepCard({
   onSkip,
 }: {
   step: VisitStep;
-  allSteps: VisitStep[];
   servicePointLabel: (nodeId: number) => string;
   busy: boolean;
   onStart: () => void;
@@ -148,7 +145,7 @@ function StepCard({
   onSkip: () => void;
 }) {
   const t = useTranslations("admin");
-  const startEligible = canStart(step, allSteps);
+  const startEligible = canStart(step);
   const completeEligible = canComplete(step);
   const skipEligible = canSkip(step);
 
@@ -159,6 +156,7 @@ function StepCard({
           <div className="text-[13.5px] font-semibold text-[var(--ink)]">{servicePointLabel(step.service_point)}</div>
           <div className="text-[11.5px] text-[var(--ink-faint)]">
             {t(`visitStepStatus.${step.status}` as const)}
+            {step.status === "PENDING" && step.is_next ? ` · ${t("stepEligibleNext")}` : ""}
             {!step.is_planned ? ` · ${t("adHocStep")}` : ""}
           </div>
         </div>

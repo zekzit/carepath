@@ -35,6 +35,11 @@ export type PublicVisitStep = {
   sequence_order: number;
   status: PublicVisitStepStatus;
   prerequisite_steps: number[];
+  /** True once staff has explicitly designated this PENDING step as where
+   * the patient goes next (see backend/visits/views.py::serialize_public_visit).
+   * Drives the "eligible/blue" vs plain grey PENDING distinction — see
+   * StepTimeline.tsx's blue color spec (SRS: ฟ้า = รอดำเนินการ). */
+  is_next: boolean;
   started_at: string | null;
   completed_at: string | null;
   service_point: PublicVisitServicePoint;

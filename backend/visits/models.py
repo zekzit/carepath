@@ -66,6 +66,12 @@ class VisitStep(models.Model):
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     is_planned = models.BooleanField(default=True)
+    # Staff-designated eligibility: True only once a staff member has
+    # explicitly chosen this step as where the patient goes next (via
+    # VisitStepViewSet.complete/skip's next_step_ids, or auto-set at
+    # registration for root steps) — NOT a mirror of "prerequisites happen
+    # to be satisfied". See GAP.md FR-19/FR-21.
+    is_next = models.BooleanField(default=False)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

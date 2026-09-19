@@ -6,15 +6,19 @@ import { ApiError } from "@/lib/api/client";
 import { nodesApi, type FacilityNode } from "@/lib/api/facility";
 import {
   completeVisitStep,
+  insertVisitStep,
   listVisitSteps,
   skipVisitStep,
   startVisitStep,
+  type EligibleNextStepsError,
   type Patient,
   type Visit,
   type VisitStep,
 } from "@/lib/api/visits";
 import type { PathwayTemplate } from "@/lib/api/pathway";
 import { AdminStepTimeline } from "./AdminStepTimeline";
+import { DesignateNextStepModal } from "./DesignateNextStepModal";
+import { InsertUnplannedStepModal } from "./InsertUnplannedStepModal";
 import { VisitQrCodeButton } from "./VisitQrCodeButton";
 import { VisitLinkButton } from "./VisitLinkButton";
 
@@ -24,6 +28,25 @@ function detailFromError(err: unknown): string | null {
   }
   return null;
 }
+
+function isEligibleNextStepsError(err: unknown): err is ApiError & { body: EligibleNextStepsError } {
+  return (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    !!err.body &&
+    typeof err.body === "object" &&
+    Array.isArray((err.body as Record<string, unknown>).eligible_next_steps)
+  );
+}
+
+/** Pending "complete" or "skip" call waiting on staff to designate which
+ * newly-unlocked follow-up step(s) (from the 409's eligible_next_steps) the
+ * patient goes to next — see DesignateNextStepModal. */
+type PendingDesignation = {
+  stepId: number;
+  kind: "complete" | "skip";
+  options: EligibleNextStepsError["eligible_next_steps"];
+};
 
 export function VisitDetail({
   visit,
@@ -44,6 +67,13 @@ export function VisitDetail({
   const [loading, setLoading] = useState(true);
   const [busyStepId, setBusyStepId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingDesignation, setPendingDesignation] = useState<PendingDesignation | null>(null);
+  const [designateBusy, setDesignateBusy] = useState(false);
+  const [designateError, setDesignateError] = useState<string | null>(null);
+  const [insertModalOpen, setInsertModalOpen] = useState(false);
+  const [insertBusy, setInsertBusy] = useState(false);
+  const [insertError, setInsertError] = useState<string | null>(null);
+  const [insertConfirmation, setInsertConfirmation] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +101,11 @@ export function VisitDetail({
     return node ? node.name_th : `#${nodeId}`;
   }
 
-  async function runAction(stepId: number, action: (id: number) => Promise<VisitStep>) {
+  async function runAction(
+    stepId: number,
+    kind: "start" | "complete" | "skip",
+    action: (id: number) => Promise<VisitStep>,
+  ) {
     setActionError(null);
     setBusyStepId(stepId);
     try {
@@ -80,9 +114,51 @@ export function VisitDetail({
       setSteps(refreshed);
       await onVisitStatusChanged();
     } catch (err) {
-      setActionError(detailFromError(err) ?? t("formGenericError"));
+      // complete/skip can reject with a 409 asking staff to designate which
+      // newly-unlocked follow-up step(s) the patient goes to next — open the
+      // picker instead of surfacing this as a plain error.
+      if ((kind === "complete" || kind === "skip") && isEligibleNextStepsError(err)) {
+        setPendingDesignation({ stepId, kind, options: err.body.eligible_next_steps });
+      } else {
+        setActionError(detailFromError(err) ?? t("formGenericError"));
+      }
     } finally {
       setBusyStepId(null);
+    }
+  }
+
+  async function confirmDesignation(selectedIds: number[]) {
+    if (!pendingDesignation) return;
+    setDesignateBusy(true);
+    setDesignateError(null);
+    try {
+      const apply = pendingDesignation.kind === "complete" ? completeVisitStep : skipVisitStep;
+      await apply(pendingDesignation.stepId, selectedIds);
+      const refreshed = await listVisitSteps(visit.id);
+      setSteps(refreshed);
+      await onVisitStatusChanged();
+      setPendingDesignation(null);
+    } catch (err) {
+      setDesignateError(detailFromError(err) ?? t("designateNextError"));
+    } finally {
+      setDesignateBusy(false);
+    }
+  }
+
+  async function submitInsertStep(currentStepId: number, servicePointId: number, insertBeforeStepIds: number[]) {
+    setInsertBusy(true);
+    setInsertError(null);
+    try {
+      const created = await insertVisitStep(currentStepId, servicePointId, insertBeforeStepIds);
+      const refreshed = await listVisitSteps(visit.id);
+      setSteps(refreshed);
+      setInsertModalOpen(false);
+      setInsertConfirmation(t("insertStepAddedConfirmation", { count: created.target_queue_waiting_count }));
+      window.setTimeout(() => setInsertConfirmation(null), 4000);
+    } catch (err) {
+      setInsertError(detailFromError(err) ?? t("formGenericError"));
+    } finally {
+      setInsertBusy(false);
     }
   }
 
@@ -110,17 +186,62 @@ export function VisitDetail({
       </div>
 
       {actionError && <div className="rounded-lg bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{actionError}</div>}
+      {insertConfirmation && (
+        <div className="rounded-lg bg-[var(--surface-app)] px-3 py-2 text-[12.5px] text-[var(--ink)]">
+          {insertConfirmation}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-[12.5px] text-[var(--ink-faint)]">{t("loading")}</div>
       ) : (
-        <AdminStepTimeline
-          steps={steps}
+        <>
+          <button
+            type="button"
+            onClick={() => setInsertModalOpen(true)}
+            disabled={steps.length === 0}
+            className="self-start rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {t("insertStepCta")}
+          </button>
+
+          <AdminStepTimeline
+            steps={steps}
+            servicePointLabel={servicePointLabel}
+            busyStepId={busyStepId}
+            onStart={(id) => runAction(id, "start", startVisitStep)}
+            onComplete={(id) => runAction(id, "complete", completeVisitStep)}
+            onSkip={(id) => runAction(id, "skip", skipVisitStep)}
+          />
+        </>
+      )}
+
+      {pendingDesignation && (
+        <DesignateNextStepModal
+          options={pendingDesignation.options}
+          busy={designateBusy}
+          error={designateError}
+          onConfirm={confirmDesignation}
+          onCancel={() => {
+            setPendingDesignation(null);
+            setDesignateError(null);
+          }}
+        />
+      )}
+
+      {insertModalOpen && (
+        <InsertUnplannedStepModal
+          visitSteps={steps}
+          defaultCurrentStepId={steps.find((s) => s.status === "IN_PROGRESS")?.id ?? steps[0]?.id ?? null}
+          servicePointNodes={nodes.filter((n) => n.node_type === "SERVICE_POINT")}
           servicePointLabel={servicePointLabel}
-          busyStepId={busyStepId}
-          onStart={(id) => runAction(id, startVisitStep)}
-          onComplete={(id) => runAction(id, completeVisitStep)}
-          onSkip={(id) => runAction(id, skipVisitStep)}
+          busy={insertBusy}
+          error={insertError}
+          onSubmit={submitInsertStep}
+          onCancel={() => {
+            setInsertModalOpen(false);
+            setInsertError(null);
+          }}
         />
       )}
     </div>

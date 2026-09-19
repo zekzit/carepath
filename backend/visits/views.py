@@ -36,6 +36,7 @@ _visit_step_payload = inline_serializer(
         "sequence_order": serializers.IntegerField(),
         "status": serializers.CharField(),
         "prerequisite_steps": serializers.ListField(child=serializers.IntegerField()),
+        "is_next": serializers.BooleanField(),
         "started_at": serializers.DateTimeField(allow_null=True),
         "completed_at": serializers.DateTimeField(allow_null=True),
         "service_point": _service_point_payload,
@@ -113,6 +114,7 @@ def serialize_public_visit(visit: Visit) -> dict:
             "sequence_order": step.sequence_order,
             "status": step.status,
             "prerequisite_steps": [p.id for p in step.prerequisite_steps.all()],
+            "is_next": step.is_next,
             "started_at": step.started_at,
             "completed_at": step.completed_at,
             "service_point": {
@@ -130,10 +132,12 @@ def serialize_public_visit(visit: Visit) -> dict:
             },
         }
 
-    # Same eligibility rule as the Admin Portal's start action (MODELS.md § 3:
-    # every prerequisite must be DONE — a SKIPPED one does not count), just
-    # computed in bulk here from an already-fetched list instead of a
-    # per-step DB query, since we're composing the whole visit at once.
+    # Eligibility is now staff-designated (`is_next`), not re-derived from
+    # prerequisites here — see GAP.md FR-19/FR-21. `is_next` is only ever set
+    # (via the Admin Portal's complete/skip next_step_ids, or auto-set at
+    # registration for root steps) once prerequisites are already satisfied,
+    # so checking it alone is not a relaxation of the old rule, just moving
+    # the source of truth to the staff action.
     #
     # Returned as a list (next_steps) instead of a single step so the
     # Patient/Kiosk portals can show the full fan-out: steps that share a
@@ -141,17 +145,11 @@ def serialize_public_visit(visit: Visit) -> dict:
     # rest stay PENDING. If no step is IN_PROGRESS yet, every parallel
     # option comes back as PENDING with its own (possibly null) queue
     # ticket, so the portal can render each as an independent card.
-    done_ids = {s.id for s in steps if s.status == VisitStep.Status.DONE}
     in_progress = [s for s in steps if s.status == VisitStep.Status.IN_PROGRESS]
     if in_progress:
         eligible = in_progress
     else:
-        eligible = [
-            s
-            for s in steps
-            if s.status == VisitStep.Status.PENDING
-            and {p.id for p in s.prerequisite_steps.all()}.issubset(done_ids)
-        ]
+        eligible = [s for s in steps if s.status == VisitStep.Status.PENDING and s.is_next]
 
     def next_step_payload(step: VisitStep) -> dict:
         ticket = getattr(step, "queue_ticket", None)

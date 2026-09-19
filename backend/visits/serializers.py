@@ -42,6 +42,15 @@ class VisitStepSerializer(serializers.ModelSerializer):
     is_planned = serializers.BooleanField(
         help_text="True if this step came from the snapshot of the visit's pathway template; false for ad-hoc steps added later.",
     )
+    is_next = serializers.BooleanField(
+        help_text=(
+            "True once staff has explicitly designated this PENDING step as "
+            "where the patient goes next (via complete/skip's next_step_ids, "
+            "or auto-set at registration for the pathway's root step(s)). "
+            "Read-only — set only via the start/complete/skip/insert-next actions, "
+            "never directly writable."
+        ),
+    )
 
     class Meta:
         model = VisitStep
@@ -53,6 +62,7 @@ class VisitStepSerializer(serializers.ModelSerializer):
             "prerequisite_steps",
             "status",
             "is_planned",
+            "is_next",
             "started_at",
             "completed_at",
         ]
@@ -122,12 +132,22 @@ class VisitSerializer(serializers.ModelSerializer):
             )
             for template_step in template_steps
         }
+        root_step_ids = []
         for template_step in template_steps:
             prereq_ids = [p.id for p in template_step.prerequisite_steps.all()]
             if not prereq_ids:
+                root_step_ids.append(step_by_template_id[template_step.id].id)
                 continue
             step_by_template_id[template_step.id].prerequisite_steps.set(
                 [step_by_template_id[pid] for pid in prereq_ids if pid in step_by_template_id]
             )
+
+        # Auto-designate the pathway's root step(s) — those with zero
+        # prerequisite_steps — as staff-designated "next" so registration ->
+        # immediate first check-in keeps working without an extra explicit
+        # designate call. There can be more than one when a template's
+        # first steps fan out in parallel. See GAP.md FR-19/FR-21.
+        if root_step_ids:
+            VisitStep.objects.filter(id__in=root_step_ids).update(is_next=True)
 
         return visit

@@ -7,6 +7,10 @@
   --brand-teal: #2b9c8f;
   --brand-amber: #e9ae45;
   --brand-amber-ink: #3a2a05;
+  /* SRS Flow Diagram color spec: ฟ้า (blue) = รอดำเนินการ, จุดถัดไปที่เจ้าหน้าที่ระบุให้ไป
+     — a staff-designated ("is_next") PENDING step, distinct from a plain
+     not-yet-eligible grey PENDING step. See StepTimeline.tsx. */
+  --brand-blue: #4a90d9;
 
   /* Role indicator colors (Admin Portal — see StaffRole in accounts app) */
   --role-registrar: #e0a458;
@@ -30,6 +34,7 @@
   --color-brand-ink: var(--brand-ink);
   --color-brand-teal: var(--brand-teal);
   --color-brand-amber: var(--brand-amber);
+  --color-brand-blue: var(--brand-blue);
   --color-surface-app: var(--surface-app);
   --color-surface-card: var(--surface-card);
   --color-border-subtle: var(--border-subtle);

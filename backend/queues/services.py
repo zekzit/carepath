@@ -19,3 +19,15 @@ def ensure_ticket_for_step(step) -> QueueTicket:
     )
     next_number = (QueueTicket.objects.filter(queue=queue).aggregate(Max("ticket_number"))["ticket_number__max"] or 0) + 1
     return QueueTicket.objects.create(queue=queue, visit_step=step, ticket_number=next_number)
+
+
+def waiting_count_for_service_point(node, date=None) -> int:
+    """Current WAITING-ticket count at `node`'s queue for `date` (default:
+    today). Used by the staff "designate next step" / "insert unplanned
+    step" workflows (see GAP.md FR-19/FR-20) to show the target service
+    point's queue length before staff commits to sending a patient there.
+    Returns 0 when there's no Queue yet for that node/date."""
+    queue = Queue.objects.filter(service_point=node, queue_date=date or timezone.localdate()).first()
+    if queue is None:
+        return 0
+    return queue.tickets.filter(status=QueueTicket.Status.WAITING).count()

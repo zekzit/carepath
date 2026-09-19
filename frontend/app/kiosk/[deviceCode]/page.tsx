@@ -29,6 +29,7 @@ const DEMO_VISIT: PublicVisit = {
       sequence_order: 1,
       status: "DONE",
       prerequisite_steps: [],
+      is_next: false,
       started_at: "2026-09-19T01:15:00Z",
       completed_at: "2026-09-19T01:32:00Z",
       service_point: {
@@ -53,6 +54,7 @@ const DEMO_VISIT: PublicVisit = {
       sequence_order: 2,
       status: "DONE",
       prerequisite_steps: [1],
+      is_next: false,
       started_at: "2026-09-19T01:35:00Z",
       completed_at: "2026-09-19T02:10:00Z",
       service_point: {
@@ -74,6 +76,7 @@ const DEMO_VISIT: PublicVisit = {
       sequence_order: 3,
       status: "IN_PROGRESS",
       prerequisite_steps: [2],
+      is_next: false,
       started_at: "2026-09-19T02:15:00Z",
       completed_at: null,
       service_point: {
@@ -95,6 +98,7 @@ const DEMO_VISIT: PublicVisit = {
       sequence_order: 3,
       status: "PENDING",
       prerequisite_steps: [2],
+      is_next: false,
       started_at: null,
       completed_at: null,
       service_point: {
@@ -116,6 +120,7 @@ const DEMO_VISIT: PublicVisit = {
       sequence_order: 4,
       status: "PENDING",
       prerequisite_steps: [3, 4],
+      is_next: false,
       started_at: null,
       completed_at: null,
       service_point: {
