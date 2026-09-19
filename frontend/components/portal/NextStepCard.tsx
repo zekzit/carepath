@@ -1,15 +1,19 @@
 import { useLocale, useTranslations } from "next-intl";
-import type { VisitView } from "@/lib/portal-data";
+import type { AppLocale } from "@/i18n/locales";
+import type { PublicVisitStep } from "@/lib/api/public-visit";
+import { serviceStepLocationName } from "@/lib/api/public-visit";
 import { MapPinIcon, NavigateIcon } from "@/components/icons";
 
 type Scale = "default" | "kiosk";
 
-export function NextStepCard({ nextStep, scale = "default" }: { nextStep: VisitView["nextStep"]; scale?: Scale }) {
+// No walk-time estimate here — there is no routing engine/distance data
+// behind this endpoint (see lib/api/public-visit.ts), so this only shows
+// where to go, not how long it takes.
+export function NextStepCard({ nextStep, scale = "default" }: { nextStep: PublicVisitStep; scale?: Scale }) {
   const t = useTranslations("patient");
-  const locale = useLocale();
+  const locale = useLocale() as AppLocale;
   const isKiosk = scale === "kiosk";
-  const name = locale === "th" ? nextStep.nameTh : nextStep.nameEn;
-  const location = locale === "th" ? nextStep.locationTh : nextStep.locationEn;
+  const location = serviceStepLocationName(nextStep, locale);
 
   return (
     <div className={`flex flex-col gap-2.5 rounded-2xl bg-[var(--brand-ink)] text-white ${isKiosk ? "p-[18px]" : "p-4"}`}>
@@ -18,12 +22,7 @@ export function NextStepCard({ nextStep, scale = "default" }: { nextStep: VisitV
         <div className={`flex shrink-0 items-center justify-center rounded-[10px] bg-white/10 ${isKiosk ? "h-[42px] w-[42px]" : "h-10 w-10"}`}>
           <MapPinIcon width={isKiosk ? 22 : 20} height={isKiosk ? 22 : 20} stroke="#fff" />
         </div>
-        <div>
-          <div className={`${isKiosk ? "text-[16px]" : "text-[15px]"} font-bold`}>{name}</div>
-          <div className="text-[12px] text-[#bfe0da]">
-            {location} · {t("walkTime", { minutes: nextStep.walkTimeMinutes })}
-          </div>
-        </div>
+        <div className={`${isKiosk ? "text-[16px]" : "text-[15px]"} font-bold`}>{location}</div>
       </div>
       <button
         type="button"

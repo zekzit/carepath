@@ -31,7 +31,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  if (init.body !== undefined && !headers.has("Content-Type")) {
+  // A FormData body (file uploads — see Phase 5) must NOT get a manual
+  // Content-Type: the browser sets its own multipart/form-data boundary
+  // when it sees the body is FormData, only if the header is left unset.
+  if (init.body !== undefined && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   if (method !== "GET" && method !== "HEAD") {

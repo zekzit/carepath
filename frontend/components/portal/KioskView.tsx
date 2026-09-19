@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
-import type { KioskDevice, VisitView } from "@/lib/portal-data";
+import { useLocale, useTranslations } from "next-intl";
+import type { KioskDevice } from "@/lib/portal-data";
+import type { AppLocale } from "@/i18n/locales";
+import type { PublicVisit } from "@/lib/api/public-visit";
+import { serviceStepLocationName } from "@/lib/api/public-visit";
 import { PortalLocaleProvider } from "./locale-context";
 import { LanguageToggle } from "./LanguageToggle";
 import { NextStepCard } from "./NextStepCard";
@@ -11,7 +14,7 @@ import { KeyboardIcon, MapPinIcon, QrScanIcon, RefreshIcon } from "@/components/
 
 type KioskScreen = "idle" | "result";
 
-export function KioskView({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: VisitView }) {
+export function KioskView({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: PublicVisit }) {
   // No patient is known yet on the idle screen, so this starts on the
   // hospital's default language. Once a real scan resolves a Visit, seed
   // this from Visit.patient.preferred_language instead.
@@ -22,7 +25,7 @@ export function KioskView({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit:
   );
 }
 
-function KioskBody({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: VisitView }) {
+function KioskBody({ kiosk, demoVisit }: { kiosk: KioskDevice; demoVisit: PublicVisit }) {
   const [screen, setScreen] = useState<KioskScreen>("idle");
 
   return (
@@ -87,9 +90,10 @@ function IdleScreen({ kiosk, onScan }: { kiosk: KioskDevice; onScan: () => void 
   );
 }
 
-function ResultScreen({ visit, onReset }: { visit: VisitView; onReset: () => void }) {
+function ResultScreen({ visit, onReset }: { visit: PublicVisit; onReset: () => void }) {
   const tPatient = useTranslations("patient");
   const tKiosk = useTranslations("kiosk");
+  const locale = useLocale() as AppLocale;
 
   return (
     <div className="flex h-full flex-col">
@@ -98,15 +102,19 @@ function ResultScreen({ visit, onReset }: { visit: VisitView; onReset: () => voi
           <div className="text-[12px] text-[#9fc4be]">{tPatient("greeting")}</div>
           <LanguageToggle variant="dark" />
         </div>
-        <div className="text-[19px] font-bold text-white">{visit.patientName}</div>
+        <div className="text-[19px] font-bold text-white">{visit.patient.full_name}</div>
         <div className="mt-0.5 text-[11.5px] text-[#7faaa3]">
-          {tPatient("hnLabel")} {visit.hnCode}
+          {tPatient("hnLabel")} {visit.patient.hn_code}
         </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-3.5 overflow-auto bg-[var(--surface-app)] p-[18px]">
-        <NextStepCard nextStep={visit.nextStep} scale="kiosk" />
-        <QueueWidget queue={visit.queue} scale="kiosk" />
+        {visit.next_step && (
+          <>
+            <NextStepCard nextStep={visit.next_step} scale="kiosk" />
+            <QueueWidget ticket={visit.queue_ticket} locationName={serviceStepLocationName(visit.next_step, locale)} scale="kiosk" />
+          </>
+        )}
 
         <div className="flex-1" />
 

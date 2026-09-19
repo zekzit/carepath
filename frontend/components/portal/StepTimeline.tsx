@@ -1,26 +1,33 @@
 import { useLocale, useTranslations } from "next-intl";
-import type { VisitStepView } from "@/lib/portal-data";
-import { CheckCircleIcon, ClockIcon } from "@/components/icons";
-
-function stepName(step: VisitStepView, locale: string) {
-  return locale === "th" ? step.nameTh : step.nameEn;
-}
+import type { AppLocale } from "@/i18n/locales";
+import type { PublicVisitStep, PublicVisitStepStatus } from "@/lib/api/public-visit";
+import { serviceStepLocationName } from "@/lib/api/public-visit";
+import { CheckCircleIcon, ClockIcon, XIcon } from "@/components/icons";
 
 type Scale = "default" | "kiosk";
 
-function groupBySequence(steps: VisitStepView[]): VisitStepView[][] {
-  const groups = new Map<number, VisitStepView[]>();
+function formatCompletedAt(iso: string | null, locale: AppLocale): string {
+  if (!iso) return "";
+  return new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+function groupBySequence(steps: PublicVisitStep[]): PublicVisitStep[][] {
+  const groups = new Map<number, PublicVisitStep[]>();
   for (const step of steps) {
-    const group = groups.get(step.sequenceOrder) ?? [];
+    const group = groups.get(step.sequence_order) ?? [];
     group.push(step);
-    groups.set(step.sequenceOrder, group);
+    groups.set(step.sequence_order, group);
   }
   return [...groups.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
 }
 
-export function StepTimeline({ steps, scale = "default" }: { steps: VisitStepView[]; scale?: Scale }) {
+export function StepTimeline({ steps, scale = "default" }: { steps: PublicVisitStep[]; scale?: Scale }) {
   const t = useTranslations("patient");
-  const locale = useLocale();
+  const locale = useLocale() as AppLocale;
   const groups = groupBySequence(steps);
   const dot = scale === "kiosk" ? "h-7 w-7" : "h-[22px] w-[22px]";
   const titleSize = scale === "kiosk" ? "text-[16px]" : "text-[13.5px]";
@@ -31,9 +38,13 @@ export function StepTimeline({ steps, scale = "default" }: { steps: VisitStepVie
       {groups.map((group, groupIndex) => {
         const isLast = groupIndex === groups.length - 1;
         const isParallel = group.length > 1;
-        const groupStatus = group.some((s) => s.status === "IN_PROGRESS")
+        // A group's connector/dot is "complete" once nothing in it is left to
+        // do (DONE or SKIPPED) — a lone SKIPPED prerequisite still does NOT
+        // count as satisfied for the *next* group (that rule lives in the
+        // backend's own eligibility check, not here).
+        const groupStatus: PublicVisitStepStatus = group.some((s) => s.status === "IN_PROGRESS")
           ? "IN_PROGRESS"
-          : group.every((s) => s.status === "DONE")
+          : group.every((s) => s.status === "DONE" || s.status === "SKIPPED")
             ? "DONE"
             : "PENDING";
 
@@ -52,13 +63,18 @@ export function StepTimeline({ steps, scale = "default" }: { steps: VisitStepVie
               </div>
             ) : (
               <div className="pb-3.5">
-                <div className={`${titleSize} font-semibold ${group[0].status === "PENDING" ? "text-[var(--ink-muted)]" : ""}`}>
-                  {stepName(group[0], locale)}
+                <div
+                  className={`${titleSize} font-semibold ${
+                    group[0].status === "PENDING" || group[0].status === "SKIPPED" ? "text-[var(--ink-muted)]" : ""
+                  }`}
+                >
+                  {serviceStepLocationName(group[0], locale)}
                 </div>
                 <div className={`${metaSize} text-[var(--ink-faint)]`}>
-                  {group[0].status === "DONE" && `${t("stepDone")} · ${group[0].completedAtLabel}`}
+                  {group[0].status === "DONE" && `${t("stepDone")} · ${formatCompletedAt(group[0].completed_at, locale)}`}
                   {group[0].status === "IN_PROGRESS" && t("stepInProgress")}
                   {group[0].status === "PENDING" && t("waitingPrereq")}
+                  {group[0].status === "SKIPPED" && t("stepSkipped")}
                 </div>
               </div>
             )}
@@ -69,11 +85,18 @@ export function StepTimeline({ steps, scale = "default" }: { steps: VisitStepVie
   );
 }
 
-function StepDot({ status, className }: { status: VisitStepView["status"]; className: string }) {
+function StepDot({ status, className }: { status: PublicVisitStepStatus; className: string }) {
   if (status === "DONE") {
     return (
       <div className={`flex shrink-0 items-center justify-center rounded-full bg-[var(--brand-teal)] ${className}`}>
         <CheckCircleIcon width="60%" height="60%" stroke="#fff" strokeWidth={3} />
+      </div>
+    );
+  }
+  if (status === "SKIPPED") {
+    return (
+      <div className={`flex shrink-0 items-center justify-center rounded-full bg-[var(--border-subtle)] ${className}`}>
+        <XIcon width="55%" height="55%" stroke="var(--ink-faint)" strokeWidth={3} />
       </div>
     );
   }
@@ -87,25 +110,44 @@ function StepDot({ status, className }: { status: VisitStepView["status"]; class
   return <div className={`shrink-0 rounded-full bg-[var(--border-subtle)] ${className}`} />;
 }
 
-function ParallelStepCard({ step, scale }: { step: VisitStepView; scale: Scale }) {
+function ParallelStepCard({ step, scale }: { step: PublicVisitStep; scale: Scale }) {
   const t = useTranslations("patient");
-  const locale = useLocale();
+  const locale = useLocale() as AppLocale;
   const padding = scale === "kiosk" ? "px-4 py-3" : "px-3 py-2.5";
   const titleSize = scale === "kiosk" ? "text-[16px]" : "text-[13.5px]";
   const metaSize = scale === "kiosk" ? "text-[13px]" : "text-[11.5px]";
+  const name = serviceStepLocationName(step, locale);
 
   if (step.status === "IN_PROGRESS") {
     return (
       <div className={`mb-2 rounded-[10px] border border-[#f1e0b8] bg-[#fdf6ea] ${padding}`}>
         <div className={`${titleSize} font-bold text-[#8a6413]`}>
-          {stepName(step, locale)} — {t("stepInProgress")}
+          {name} — {t("stepInProgress")}
         </div>
+      </div>
+    );
+  }
+  if (step.status === "DONE") {
+    return (
+      <div className={`mb-2 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-app)] ${padding}`}>
+        <div className={`${titleSize} font-semibold`}>{name}</div>
+        <div className={`${metaSize} text-[var(--ink-faint)]`}>
+          {t("stepDone")} · {formatCompletedAt(step.completed_at, locale)}
+        </div>
+      </div>
+    );
+  }
+  if (step.status === "SKIPPED") {
+    return (
+      <div className={`mb-2 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-app)] ${padding}`}>
+        <div className={`${titleSize} font-semibold text-[var(--ink-muted)]`}>{name}</div>
+        <div className={`${metaSize} text-[var(--ink-faint)]`}>{t("stepSkipped")}</div>
       </div>
     );
   }
   return (
     <div className={`rounded-[10px] border border-[var(--border-subtle)] bg-[var(--surface-app)] ${padding}`}>
-      <div className={`${titleSize} font-semibold text-[var(--ink-muted)]`}>{stepName(step, locale)}</div>
+      <div className={`${titleSize} font-semibold text-[var(--ink-muted)]`}>{name}</div>
       <div className={`${metaSize} text-[var(--ink-faint)]`}>{t("parallelNote")}</div>
     </div>
   );
