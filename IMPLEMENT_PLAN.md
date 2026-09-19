@@ -239,17 +239,20 @@ template อัตโนมัติ → เดินหน้าทีละ st
 
 **อัปเดต API contract จาก Phase 1**: `PATCH /api/facility/floors/{id}` รับ `plan_image` เพิ่มได้แล้ว (multipart), `POST/PATCH /api/facility/edges` รับ `distance_m` เป็น optional แล้ว
 
-### Frontend — ยังไม่ได้ทำ
+### Frontend — เสร็จแล้ว (ทดสอบผ่าน browser จริง + cross-check ด้วย curl/คำนวณมือ)
 
-- Canvas overlay บนรูป `plan_image`: แสดงตำแหน่ง Node ปัจจุบัน (จาก `pos_x`/`pos_y`), ลากเพื่อย้ายตำแหน่ง (อัปเดตกลับด้วย `PATCH`), เลือก 2 Node เพื่อสร้าง Edge ระหว่างกัน (เว้น `distance_m` ว่างให้ backend auto-calc)
-- เครื่องมือ calibrate scale: คลิก 2 จุดบนภาพเทียบกับระยะจริงที่กรอก แล้วคำนวณ/บันทึก `plan_scale_m_per_px`
-- อัปโหลด `plan_image` ต้องส่งเป็น `FormData` ตรง ๆ ผ่าน `apiFetch` (แก้ [lib/api/client.ts](frontend/lib/api/client.ts) แล้วให้ไม่ยัด `Content-Type: application/json` ทับ `FormData` body — เดิมมีบั๊กนี้อยู่ พบและแก้แล้วระหว่างเตรียม phase นี้) **ห้ามใช้ `createResourceClient`** สำหรับ upload เพราะมัน `JSON.stringify` ทุกครั้ง
+- [x] `components/admin/facility/FloorMapSection.tsx` (ใหม่, แท็บ "ผังภาพ") — เลือก Floor → อัปโหลด/เปลี่ยน `plan_image` ผ่าน `uploadFloorPlanImage()` (multipart ตรงผ่าน `apiFetch`) → แสดง Node ทุกตัวของ floor นั้นเป็นจุดวางทับภาพ แปลงพิกัด natural↔displayed ด้วย `ResizeObserver` + `naturalWidth/naturalHeight` ถูกต้อง
+- [x] ลากจุดย้ายตำแหน่ง (pointer events + `setPointerCapture`, แยก click กับ drag ด้วย threshold) → `PATCH` กลับด้วยพิกัดจริงที่แปลงกลับเป็น natural coordinates แล้ว
+- [x] คลิกเลือก 2 จุด → mini-form สร้าง Edge (เว้น `distance_m` ว่าง = auto-calc) พร้อม map DRF error แบบเดียวกับ `RecordFormSheet`
+- [x] เครื่องมือ calibrate: คลิก 2 จุดบนภาพ + กรอกระยะจริง (เมตร) → คำนวณ/บันทึก `plan_scale_m_per_px`
+- [x] อัปเดต `lib/api/facility.ts`: เพิ่ม `Floor.plan_image`, ทำ `FacilityEdgeInput.distance_m` เป็น optional, เพิ่ม `uploadFloorPlanImage()` — และ `EdgesSection.tsx` (ฟอร์มธรรมดาจาก Phase 1) อัปเดตให้ `distance_m` ไม่บังคับแล้วเช่นกัน พร้อม help text
 
-### Definition of Done
+**ตรวจสอบอิสระ (ทำเองอีกรอบ ไม่ได้เชื่อ agent report เฉย ๆ)**: อ่านโค้ด coordinate-conversion helper เอง (`natural * scale` / `displayed / scale` ถูกต้องตรงไปตรงมา), รัน `eslint`+`next build` (clean cache) ผ่านทั้งคู่, ทดสอบเองผ่าน browser จริง: ลากจุด "ทางแยก" จริงแล้วเช็คผ่าน API ว่าตำแหน่งเปลี่ยนตามสัดส่วนที่ลาก, เลือก 2 จุด (ห้องแล็บ pos 10,20 + คีออสก์ทดสอบ pos 50,50 บน floor scale 0.05 m/px) สร้าง edge เว้น `distance_m` ว่าง แล้ว**คำนวณระยะทางด้วยมือเอง** (`√((50-10)²+(50-20)²)×0.05 = 2.5`) เทียบกับค่าที่ backend คืนมา — **ตรงกันเป๊ะ (2.5)**
+
+### Definition of Done — ผ่านแล้ว
 
 อัปโหลดภาพผังพื้นให้ Floor หนึ่งชั้น, ลากวางตำแหน่ง Node บนภาพได้ตรงจุดจริง, วาด Edge เชื่อม
-Node สองจุดแล้วระบบคำนวณ `distance_m` ให้อัตโนมัติจาก scale ที่ calibrate ไว้ (backend ผ่านแล้ว
-รอ frontend)
+Node สองจุดแล้วระบบคำนวณ `distance_m` ให้อัตโนมัติจาก scale ที่ calibrate ไว้
 
 ---
 
