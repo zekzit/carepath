@@ -16,6 +16,7 @@ import {
 import type { PathwayTemplate } from "@/lib/api/pathway";
 import { AdminStepTimeline } from "./AdminStepTimeline";
 import { VisitQrCodeButton } from "./VisitQrCodeButton";
+import { VisitLinkButton } from "./VisitLinkButton";
 
 function detailFromError(err: unknown): string | null {
   if (err instanceof ApiError && err.body && typeof err.body === "object" && "detail" in err.body) {
@@ -102,7 +103,10 @@ export function VisitDetail({
             {visit.uses_wheelchair ? ` · ${t("colWheelchair")}` : ""}
           </div>
         </div>
-        <VisitQrCodeButton token={visit.qr_token} patientName={patient?.full_name ?? `#${visit.patient}`} hn={patient?.hn_code ?? "—"} />
+        <div className="flex shrink-0 items-start gap-2">
+          <VisitLinkButton token={visit.qr_token} />
+          <VisitQrCodeButton token={visit.qr_token} patientName={patient?.full_name ?? `#${visit.patient}`} hn={patient?.hn_code ?? "—"} />
+        </div>
       </div>
 
       {actionError && <div className="rounded-lg bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{actionError}</div>}
