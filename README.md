@@ -32,6 +32,21 @@ python manage.py runserver 8000
 API is normally reached through the frontend's proxy (see below), but you can also hit Django directly:
 Sample endpoint: `GET http://localhost:8000/api/health` → `{"status": "ok"}`
 
+### Data models
+
+Domain models live in per-domain apps, following [MODELS.md](MODELS.md):
+
+```
+facility/   Building, Floor, Node, Edge
+pathway/    CareCategory, PathwayTemplate, TemplateStep
+visits/     Patient, Visit, VisitStep
+queues/     Queue, QueueTicket, ServiceSchedule
+accounts/   StaffUser (custom user model, AUTH_USER_MODEL), ServicePointStaff, AuditLog
+core/       just the /api/health check — no domain models
+```
+
+All are registered in Django admin (`python manage.py createsuperuser`, then `/admin/`) for manual data entry while there's no UI yet.
+
 ## Frontend setup
 
 ```bash

@@ -11,8 +11,13 @@ field class ที่จะใช้ (`CharField`, `FloatField`, ...) เพื�
 | `facility`   | Building, Floor, Node, Edge |
 | `pathway`    | CareCategory, PathwayTemplate, TemplateStep |
 | `visits`     | Patient, Visit, VisitStep |
-| `queue`      | Queue, QueueTicket, ServiceSchedule |
+| `queues`     | Queue, QueueTicket, ServiceSchedule |
 | `accounts`   | StaffUser, ServicePointStaff, AuditLog |
+
+> App ชื่อ `queue` ถูกเปลี่ยนเป็น `queues` ตอน implement จริง เพราะ `queue` ชนกับชื่อ Python
+> standard library module (`queue.Queue`) ซึ่งไลบรารีหลายตัว (urllib3, Celery, ...) `import queue`
+> ภายใน — ถ้าตั้งชื่อแอปซ้ำจะ shadow stdlib module ทั้ง process ชื่อ model (`Queue`, `QueueTicket`,
+> `ServiceSchedule`) ไม่เปลี่ยน
 
 ทุก model มี `id` เป็น auto primary key (Django default) จึงไม่เขียนซ้ำในรายการ field ด้านล่าง
 
