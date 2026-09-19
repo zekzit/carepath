@@ -120,27 +120,41 @@ GET/POST            /api/accounts/staff-users, /service-point-staff
 
 Phase นี้มี business logic เยอะที่สุด — เป็นหัวใจของระบบ ควร review ก่อนไป phase 3
 
-### Backend
+### Backend — เสร็จแล้ว (ทดสอบผ่าน curl ทั้ง happy-path และ error case)
 
 **visits**
-- `Patient`: CRUD ปกติ + endpoint ค้นหาด้วย `hn_code` (สำหรับตอนลงทะเบียนเช็คว่าเคยมีในระบบหรือยัง)
-- `Visit`: สร้างผ่าน custom serializer ไม่ใช่ plain CRUD เพราะตอนสร้างต้อง:
-  1. generate `qr_token` แบบสุ่ม (เช่น `secrets.token_urlsafe(48)`) ไม่ให้ client ส่งมาเอง
-  2. **snapshot `VisitStep` จาก `TemplateStep` ของ `pathway_template` ที่เลือก** — copy `sequence_order` + `service_point` ทุกแถว แล้ว map `prerequisite_steps` (M2M ข้าม template→visit ต้อง translate id ใหม่ ไม่ใช่ copy id ตรง ๆ)
-  3. ตั้ง `status = REGISTERED`
-- `VisitStep`: ไม่มี endpoint update ทั่วไป ให้ทำเป็น action เฉพาะ: `POST /api/visits/steps/{id}/start`, `POST /api/visits/steps/{id}/complete`, `POST /api/visits/steps/{id}/skip` — ทุก action ต้องเช็คกติกาใน MODELS.md § 3: "เริ่มได้ก็ต่อเมื่อ prerequisite_steps ทุกตัว status=DONE" (โยน 400 ถ้าเงื่อนไขไม่ผ่าน)
+- [x] `Patient`: CRUD ปกติ + `GET /api/visits/patients?hn_code=...` (icontains filter)
+- [x] `Visit`: `VisitSerializer.create()` — generate `qr_token` (`secrets.token_urlsafe(48)`), snapshot `VisitStep` จาก `TemplateStep` ของ `pathway_template` ที่เลือก (copy `sequence_order`/`service_point`, remap `prerequisite_steps` จาก TemplateStep id → VisitStep id ใหม่ — ทดสอบแล้วว่า map ถูกต้อง), ตั้ง `status=REGISTERED` ทั้งหมดอยู่ใน `transaction.atomic`
+- [x] `VisitStep`: `ReadOnlyModelViewSet` (ไม่มี PATCH ทั่วไปตามแผน) + action `POST /api/visits/visit-steps/{id}/start|complete|skip` — `start` เช็ค prerequisite ทุกตัว `status=DONE` จริง (ทดสอบ reject เมื่อยังไม่ครบ, ทดสอบว่า prerequisite ที่ถูก **SKIPPED ไม่ถือว่านับ** ตาม MODELS.md ที่ระบุ "DONE" ตรง ๆ ไม่ใช่ "DONE หรือ SKIPPED") `start` ยังสร้าง `QueueTicket` ให้อัตโนมัติและเลื่อน `Visit.status` เป็น `IN_PROGRESS` ถ้ายังเป็น `REGISTERED`
+- [x] `visits/services.py` (ใหม่) — `complete_step()`/`skip_step()`/`sync_visit_completion()` เป็นจุดเดียวที่ mark step เสร็จ ใช้ร่วมกันทั้งจาก `VisitStep.complete` action และจาก `QueueTicket.done` action (ทดสอบแล้วว่า sync ถูกทั้งสองทาง) — `sync_visit_completion` เปลี่ยน `Visit.status` เป็น `COMPLETED` อัตโนมัติเมื่อทุก step เป็น DONE/SKIPPED ครบ (ไม่ได้อยู่ใน MODELS.md ตรง ๆ แต่เป็นส่วนต่อที่สมเหตุสมผลเพราะ model มี status นี้อยู่แล้ว)
 
 **queues**
-- `Queue`: get-or-create อัตโนมัติต่อ `(service_point, queue_date=today)` ไม่ต้องมี endpoint create ตรง ๆ ให้ผูกเข้ากับตอนสร้าง `QueueTicket` แทน
-- `QueueTicket`: สร้างอัตโนมัติเมื่อ `VisitStep` ถูก `start` (เชื่อม `visit_step` แบบ `OneToOne` ตาม model) — `ticket_number` ให้ auto-increment ต่อ `Queue` ของวันนั้น
-- Action เฉพาะ: `POST /api/queues/{id}/call-next` (เลื่อน `Queue.current_number`, เปลี่ยน ticket ที่เกี่ยวข้องเป็น `CALLED`, set `called_at`), `POST /api/queue-tickets/{id}/serve`, `POST /api/queue-tickets/{id}/done`
+- [x] `Queue`: `ReadOnlyModelViewSet`, ไม่มี create endpoint ตรง ๆ (get-or-create อัตโนมัติใน `queues/services.py::ensure_ticket_for_step` ตอน `VisitStep.start`) list default = วันนี้เท่านั้น เว้นแต่ส่ง `?queue_date=`
+- [x] `QueueTicket`: `ticket_number` auto-increment ต่อ `Queue` (`Max(ticket_number)+1`), action `POST /api/queues/queue-tickets/{id}/serve` (`CALLED→SERVING`), `POST /api/queues/queue-tickets/{id}/done` (เรียก `visits.services.complete_step` ตรง ๆ — จุดเดียวกับที่ `VisitStep.complete` ใช้)
+- [x] action `POST /api/queues/queues/{id}/call-next` — เลื่อน ticket `WAITING` ตัวถัดไป (`ticket_number` น้อยสุด) เป็น `CALLED`, set `called_at`, sync `Queue.current_number`
 
-### Frontend
+**API ที่ใช้ได้จริงตอนนี้** (เพิ่มจาก Phase 1, `AllowAny`, ไม่มี trailing slash):
+```
+GET/POST/PATCH/DELETE   /api/visits/patients, /api/visits/patients/{id}
+GET/POST/PATCH/DELETE   /api/visits/visits, /api/visits/visits/{id}
+GET                     /api/visits/visit-steps?visit={id}
+POST                    /api/visits/visit-steps/{id}/start|complete|skip
+GET                     /api/queues/queues?service_point={id}&queue_date=YYYY-MM-DD (default: today)
+POST                    /api/queues/queues/{id}/call-next
+GET                     /api/queues/queue-tickets?queue={id}
+POST                    /api/queues/queue-tickets/{id}/serve|done
+```
 
-- `/admin/visits`: ฟอร์มลงทะเบียน (ค้นหา/สร้าง Patient → เลือก PathwayTemplate → submit สร้าง Visit) + รายการ Visit วันนี้ + หน้า detail แสดง step timeline พร้อมปุ่ม start/complete/skip (นำ [StepTimeline](frontend/components/portal/StepTimeline.tsx) มาปรับใช้ฝั่ง Admin ได้ เพราะ grouping ตาม `sequenceOrder` ใช้ตรรกะเดียวกัน)
-- `/admin/queue`: เลือกจุดบริการ (จาก `ServicePointStaff` ของ user ปัจจุบัน — มี session จริงแล้วตั้งแต่ Phase 0 — หรือ dropdown ทั้งหมดถ้ายังไม่ได้ผูก assignment) → แสดง current number + ปุ่มเรียกคิวถัดไป + รายการ ticket ที่กำลังรอ
+### Frontend — เสร็จแล้ว (ทดสอบผ่าน browser จริง + cross-check ด้วย curl)
 
-### Definition of Done
+- [x] `/admin/visits` (`components/admin/visits/`) — `RegisterVisitForm.tsx` (ค้นหา patient ด้วย HN แบบ live search debounce 300ms → สร้าง patient ใหม่ inline ถ้าไม่เจอ → เลือก PathwayTemplate + วันที่ (default วันนี้) + wheelchair → submit สร้าง Visit), `VisitsList.tsx` (รายการ, filter ตามวันที่ได้), `VisitDetail.tsx` + `AdminStepTimeline.tsx` (group ตาม `sequence_order` แบบเดียวกับ [StepTimeline](frontend/components/portal/StepTimeline.tsx) แต่เขียนใหม่เพราะ data shape ไม่ตรงกัน — มีปุ่ม start/complete/skip ต่อ step, เช็ค eligibility ฝั่ง client ตรงตามกติกา backend รวมถึงเคส SKIPPED ไม่นับเป็น prerequisite ที่ผ่าน)
+- [x] `/admin/queue` (`components/admin/queue/QueueConsolePage.tsx`) — เลือกจุดบริการ (SERVICE_POINT node เท่านั้น) → แสดง current_number + เรียกคิวถัดไป (จัดการ state "ยังไม่มีคิววันนี้" ให้ด้วย) → รายการ ticket พร้อมชื่อผู้ป่วย (resolve จาก ticket→visit_step→visit→patient โดย fetch ลิสต์มา cross-reference ไม่ waterfall ทีละ ticket) + ปุ่ม serve/done ตาม status
+- [x] เพิ่ม `lib/api/visits.ts` (Patient/Visit/VisitStep types + resource client + action helper สำหรับ start/complete/skip) และเพิ่ม Queue/QueueTicket เข้า `lib/api/queues.ts`
+- [x] i18n key ใหม่ทั้งหมดอยู่ใน `messages/th.json`/`en.json` ครบทั้งสองภาษา
+
+**ตรวจสอบอิสระ (ทำเองอีกรอบ ไม่ได้เชื่อ agent report เฉย ๆ)**: อ่านโค้ด `AdminStepTimeline.tsx`/`RegisterVisitForm.tsx` เอง, รัน `eslint`+`next build` (clean cache) ซ้ำเองผ่านทั้งคู่, แล้วเดินสถานการณ์จริงผ่าน browser เองตั้งแต่ต้นจนจบ: เปิด step ที่ 2 (เอกซเรย์) หลัง prerequisite เสร็จ → ไปหน้า Queue Console เรียกคิว → ให้บริการ → กดเสร็จสิ้น แล้วยืนยันผ่าน `curl` ตรงว่า `VisitStep` เปลี่ยนเป็น `DONE` พร้อม `completed_at` และ `Visit` เปลี่ยนเป็น `COMPLETED` จริง ตรงกับที่ agent รายงานทุกจุด
+
+### Definition of Done — ผ่านแล้ว
 
 เจ้าหน้าที่ลงทะเบียนผู้ป่วยใหม่ → เลือกแผนการรักษา → ระบบสร้าง Visit พร้อม step ครบตาม
 template อัตโนมัติ → เดินหน้าทีละ step ได้ตามกติกา prerequisite (กด start ข้าม step ที่ยังไม่พร้อมไม่ได้)
