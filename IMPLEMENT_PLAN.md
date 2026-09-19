@@ -262,20 +262,22 @@ Node สองจุดแล้วระบบคำนวณ `distance_m` ใ�
 
 ### Backend
 
-ไม่มี endpoint ใหม่ — ใช้ `by-token` endpoint เดิมจาก Phase 3 ต่อ (ผลลัพธ์ที่ต้องการเหมือนกันทุกประการ
-ไม่ว่าจะได้ token มาจากการพิมพ์มือหรือสแกนกล้อง)
+ไม่มี endpoint ใหม่ — ใช้ `by-token` endpoint เดิมจาก Phase 3 ต่อจริง (`fetchVisitByTokenClient`)
 
-### Frontend
+### Frontend — เสร็จแล้ว (ทดสอบเท่าที่ sandbox นี้ทำได้ — ดูข้อจำกัดด้านล่าง)
 
-- เพิ่ม lib ถอดรหัส QR จากภาพวิดีโอ (`jsQR` หรือ `@zxing/browser`) เปิดกล้องผ่าน `getUserMedia`
-- **ข้อกำหนดสภาพแวดล้อม**: ต้องรันบน HTTPS (หรือ `localhost`) เท่านั้น กล้องถึงจะขอ permission ได้ — ต้องเช็ค deployment ของ kiosk จริงว่ามี TLS ก่อน
-- แทนที่ปุ่ม demo ใน `KioskView` ด้วย live camera preview + auto-decode → เรียก endpoint เดียวกับที่ manual fallback ใช้ทันทีที่อ่าน QR ได้ ไม่ต้องกดปุ่มเพิ่ม
-- คง manual fallback (Phase 4) ไว้เป็นทางเลือกสำรอง กรณีกล้องเสีย/แสงไม่พอ/สแกนไม่ติด
+- [x] `lib/qr-token.ts` (ใหม่) — `extractQrToken()` pure function แยกจาก UI ทดสอบได้อิสระ รองรับทั้ง bare token, absolute URL (`/visit/<token>`), relative path — ยังไม่มี feature สร้าง QR code จริงในระบบ (นอก scope) จึงออกแบบให้รองรับหลาย shape ที่เป็นไปได้ล่วงหน้า
+- [x] เพิ่ม `jsqr` เป็น dependency จริง (ไม่ใช้ `@zxing/browser` — เหตุผล: jsQR decode ทีละ frame เฉยๆ ทำให้คุมทั้ง loop เอง (`getUserMedia` → `requestAnimationFrame`) ได้เต็มที่ ซึ่งจำเป็นเพราะต้องหยุด stream ทันทีที่ decode สำเร็จ และแยก error แต่ละแบบ (unsupported/denied/no-device) ให้ต่างกัน)
+- `KioskView.tsx`'s `IdleScreen` มี `CameraScanner` ใหม่แทนที่กราฟิกตกแต่งเดิม — เช็ค `getUserMedia`/secure-context รองรับหรือไม่ **ก่อน** ขอ permission (unsupported → ข้ามไป fallback เลย ไม่เด้ง prompt ที่รู้อยู่แล้วว่าจะพัง), permission denied/ไม่มีกล้องยุบรวมเป็นข้อความ fallback เดียวกัน (ปุ่ม demo + manual entry ยังกดได้ตลอดเวลา ไม่ถูกบัง), เจอ QR decode ไม่สำเร็จ (token ผิด/ไม่มี visit) แสดง error แล้ว **scan ต่ออัตโนมัติ** หลัง 2.5 วิ ไม่ต้องกลับไปกดใหม่เอง
+- Cleanup ปิด stream/ยกเลิก animation frame/เคลียร์ retry timer ครบตอน unmount (กด manual entry, scan สำเร็จเปลี่ยนหน้า, หรือ component ถูกถอด)
+
+**ข้อจำกัดการทดสอบ (สำคัญ ต้องรู้ก่อนใช้งานจริง)**: Browser pane ของ sandbox นี้ **บล็อก `getUserMedia` ทั้งหมด** ("the page requested camera access, which is blocked in the Browser pane") ไม่มีกล้องจริงให้ทดสอบ ดังนั้น **เส้นทาง decode QR จริงจากกล้องยังไม่เคยถูกทดสอบแบบ end-to-end จริง** ในโปรเจกต์นี้ — ทดสอบได้แค่: (1) `extractQrToken()` แยกเดี่ยว (ตรวจเองอีกรอบ ผ่าน `node -e` เพิ่มเติมจาก edge case ที่ agent เช็คแล้ว — ตรงกันหมด รวม `"https://example.com/"` → `null`) และ (2) fallback UI เมื่อกล้องใช้ไม่ได้ (ตรวจเองผ่าน browser จริง เห็นข้อความ "ใช้กล้องไม่ได้" ปุ่ม demo/manual entry ยังกดได้ปกติ ไม่ crash) — **ต้องทดสอบสแกน QR จริงบนอุปกรณ์ที่มีกล้องจริงก่อน deploy จริง**
 
 ### Definition of Done
 
 ยื่น QR code (จอมือถือหรือใบนัดที่พิมพ์) ให้กล้อง kiosk เห็น ระบบ decode แล้วดึงข้อมูล visit
-ขึ้นจออัตโนมัติโดยไม่ต้องกดปุ่มใด ๆ เพิ่ม
+ขึ้นจออัตโนมัติโดยไม่ต้องกดปุ่มใด ๆ เพิ่ม — **โค้ดพร้อมแล้ว แต่ยังไม่เคยพิสูจน์ด้วยกล้องจริง**
+เพราะ sandbox ที่พัฒนาไม่มีกล้องให้ทดสอบ (ดูรายละเอียดข้อจำกัดด้านบน)
 
 ---
 
