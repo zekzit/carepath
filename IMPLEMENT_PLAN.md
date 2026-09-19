@@ -28,7 +28,7 @@ Frontend มี route/layout/component ของทั้ง 3 portal พร้�
 | Auth (Patient/Kiosk) | **ไม่มี auth ถาวร ตามสเปค** — endpoint กลุ่มนี้ยืนยันตัวตนด้วย `Visit.qr_token` เท่านั้น แยก ViewSet ออกจากฝั่ง Admin อย่างชัดเจนตั้งแต่ต้น (คนละ permission class) อย่าใช้ ViewSet เดียวกันแล้วค่อยกั้นสิทธิ์ทีหลัง |
 | Pagination | Master data (phase 1) ปิด pagination ไปก่อน (`pagination_class = None`) เพราะ list สั้น ๆ ระดับ config ส่วน Visit/Queue list (phase 2) ค่อยเปิด `PageNumberPagination` เพราะโตเรื่อย ๆ ตามวัน |
 | Frontend data layer | เพิ่ม `frontend/lib/api/<domain>.ts` เป็น typed fetch client ต่อโดเมน (facility, pathway, visits, queues, accounts) แทนที่ mock ใน `lib/portal-data.ts` ทีละไฟล์ — type เขียนมือให้ตรงกับ serializer fields (ไม่ทำ codegen ในรอบนี้) |
-| Mutations ฝั่ง Admin | ใช้ Next.js Server Actions (pattern เดียวกับ [lib/locale-actions.ts](frontend/lib/locale-actions.ts)) เรียก backend แล้ว `revalidatePath` แทนการทำ client-side fetch + state management library ใหม่ |
+| Mutations ฝั่ง Admin | **แก้ไขจากแผนเดิม**: ใช้ client-side `apiFetch` ([lib/api/client.ts](frontend/lib/api/client.ts)) ตรง ๆ ไม่ใช่ Server Actions — เหตุผลเดียวกับที่ login/logout ใน Phase 0 ทำแบบนี้: session/CSRF cookie ต้องให้ browser จัดการเองโดยตรง ถ้าไปเรียกผ่าน Server Action (รันบน Node) จะต้อง forward `Set-Cookie`/cookie เองซึ่งยุ่งยากกว่าไม่คุ้ม ทุก component ที่มีฟอร์ม CRUD จึงต้องเป็น Client Component (`"use client"`) แล้ว re-fetch list เองหลัง mutate สำเร็จ ไม่ต้องใช้ `revalidatePath` |
 | Business logic สำคัญ | ระบุไว้ในแต่ละ phase ด้านล่าง — ต้อง implement ใน backend (serializer/model method) ไม่ใช่คำนวณฝั่ง frontend เพราะเป็นกฎที่ต้องถูกต้องไม่ว่าจะเรียกจาก client ไหน |
 
 ---
@@ -70,27 +70,45 @@ Django admin (`role` ต่าง ๆ) แล้วเห็นเมนู Side
 ครอบคลุมเมนู Admin ที่เป็น "ตั้งค่าระบบ" ทั้งหมดใน [lib/admin-nav.ts](frontend/lib/admin-nav.ts):
 ผังสถานที่, แม่แบบเส้นทางการรักษา, ตารางเวลาบริการ, ผู้ใช้งานและสิทธิ์
 
-### Backend
+### Backend — เสร็จแล้ว (ทดสอบผ่าน curl ครบทุก endpoint)
 
 | App | Resource | หมายเหตุ |
 |---|---|---|
-| `facility` | Building, Floor, Node, Edge | Node มี `clean()` ตรวจ field ตาม `node_type` อยู่แล้ว → ให้ serializer เรียก `full_clean()`/`instance.clean()` ก่อน save ไม่ใช่แค่พึ่ง DB constraint |
-| `pathway` | CareCategory, PathwayTemplate, TemplateStep | `TemplateStep.prerequisite_steps` เป็น M2M self — ใช้ `PrimaryKeyRelatedField(many=True, queryset=...)` และต้อง validate ว่า prerequisite อยู่ใน `pathway_template` เดียวกันเท่านั้น (กัน fan-in ข้าม template ผิด ๆ) |
-| `queues` | ServiceSchedule | นับเป็น master data (ตั้งเวลาเปิด-ปิดจุดบริการ) ไม่เกี่ยวกับ Queue/QueueTicket ของจริงที่ทำใน phase 2 |
-| `accounts` | StaffUser, ServicePointStaff | StaffUser: CRUD field ทั่วไป + `role` ไม่ต้องมี endpoint เปลี่ยน/ตั้งรหัสผ่านใน MVP นี้ (login ทำใน Phase 0 แล้ว แต่ตั้ง/รีเซ็ตรหัสผ่านยังทำผ่าน Django admin ไปก่อน) |
+| `facility` | Building, Floor, Node, Edge | [x] Node ใช้ `core.serializers.CleanOnValidateMixin` (ใหม่ — reusable ให้ทุก serializer ที่โมเดลมี `clean()`) เรียก `instance.clean()` ก่อน save จริง ทดสอบแล้วว่า reject node_type ผิด field ได้ |
+| `pathway` | CareCategory, PathwayTemplate, TemplateStep | [x] `prerequisite_steps` validate ข้าม `pathway_template` แล้ว (ทดสอบ reject จริง) — `service_point` field จำกัด queryset เฉพาะ `node_type=SERVICE_POINT` |
+| `queues` | ServiceSchedule | [x] เหมือนกัน `service_point` จำกัดเฉพาะ SERVICE_POINT node (ส่ง node ผิด type ได้ 400 "Invalid pk" ทันที) |
+| `accounts` | StaffUser, ServicePointStaff | [x] `StaffUserAdminSerializer` (แยกจาก `StaffUserSerializer` ที่ login/me ใช้) บังคับ `password` ตอน create แล้ว hash ด้วย `set_password()` เข้ารหัสจริง (ทดสอบ login ด้วย user ที่สร้างผ่าน API แล้วเข้าได้จริง) — `ServicePointStaff` unique_together ทำงานอัตโนมัติจาก DRF |
 
-ทุก resource ข้างบน: `ModelViewSet` มาตรฐาน (list/create/retrieve/update/destroy) — ไม่มี custom action พิเศษใน phase นี้
+ทุก resource ข้างบน: `ModelViewSet` มาตรฐาน (list/create/retrieve/update/destroy) ไม่มี custom action พิเศษ
 
-### Frontend
+**API ที่ใช้ได้จริงตอนนี้** (ทุกตัว `AllowAny`, ไม่มี trailing slash):
+```
+GET/POST            /api/facility/buildings, /floors, /nodes, /edges
+GET/PATCH/DELETE    /api/facility/buildings/{id}, /floors/{id}, /nodes/{id}, /edges/{id}
+GET/POST            /api/pathway/care-categories, /pathway-templates, /template-steps
+GET/POST            /api/queues/service-schedules
+GET/POST            /api/accounts/staff-users, /service-point-staff
+```
+(รูปแบบ error: `{"field_name": ["message"]}` หรือ `{"non_field_errors": ["message"]}`, HTTP 400 — มาตรฐาน DRF)
 
-- สร้าง reusable pattern แทน `PlaceholderContent` 1 ชุด ใช้ซ้ำทั้ง 4 หน้า:
-  - `components/admin/DataTable.tsx` (list + sort พื้นฐาน)
-  - `components/admin/RecordFormSheet.tsx` (create/edit form แบบ drawer/modal)
-  - Server Actions ต่อ resource ใน `lib/api/*.ts` สำหรับ create/update/delete + `revalidatePath`
-- แทนที่ placeholder ทีละหน้า: `/admin/facility`, `/admin/pathways`, `/admin/schedule`, `/admin/staff`
-- `/admin/facility`: จัดการ Building → Floor → Node ตามลำดับชั้น (Node ผูก Floor) + Edge เป็น **list/form ธรรมดา** (เลือก from_node/to_node จาก dropdown, กรอก distance_m/walk_time_sec เอง) — ผังเส้นเชื่อมแบบลากบนภาพ `plan_image` ไม่ทำใน phase นี้ ย้ายไป **Phase 5** ทั้งหมด
+### Frontend — เสร็จแล้ว (ทดสอบผ่าน browser จริง + cross-check ด้วย curl)
 
-### Definition of Done
+- [x] `components/admin/DataTable.tsx` — list มาตรฐาน (columns, add button, loading/empty state, ลบแบบ two-click inline confirm)
+- [x] `components/admin/RecordFormSheet.tsx` — drawer สร้าง/แก้ไข ขับเคลื่อนด้วย `FieldConfig[]` (text/email/password/number/integer/checkbox/select/multiselect/time), รองรับ field ที่ซ่อน/แสดงตามเงื่อนไข (`visible`) และ option ที่เปลี่ยนตาม field อื่นแบบ live (`getOptions`, เช่น TemplateStep prerequisite filter), map DRF error (`{"field": [...]}` / `non_field_errors`) ขึ้นแสดงถัดจากช่องนั้น ๆ อัตโนมัติ
+- [x] `components/admin/AdminTabs.tsx` + `lib/api/{resource,facility,pathway,queues,accounts}.ts` (`createResourceClient` generic CRUD wrapper รอบ `apiFetch`) + `lib/admin-form-utils.ts` (แปลงค่า form string ↔ payload ที่ backend ต้องการ)
+- [x] แก้ไขจากแผนเดิม: มัดใช้ client-side `apiFetch` ตรง ๆ ไม่ใช่ Server Actions (ดูแถว "Mutations ฝั่ง Admin" ด้านบน) ทุกหน้า/component จึงเป็น Client Component ที่ fetch/mutate เอง แล้ว refetch list หลัง mutate สำเร็จ
+- [x] แทนที่ placeholder ครบ 4 หน้า: `/admin/facility` (แท็บ Buildings/Floors/Nodes/Edges), `/admin/pathways` (แท็บ CareCategories/PathwayTemplates/TemplateSteps), `/admin/schedule` (ServiceSchedule ตารางเดียว), `/admin/staff` (StaffUsers + ServicePointStaff สองตารางในหน้าเดียว) — Edge เป็น list/form ธรรมดาตามแผน (เลือก from_node/to_node จาก dropdown) ไม่มี visual drag editor (ยังอยู่ Phase 5)
+- [x] i18n: เพิ่ม key ใหม่ทั้งหมดใน `messages/th.json` และ `en.json` ภายใต้ namespace `admin` (ไม่ hardcode ข้อความใดไว้ภาษาเดียว)
+
+**รายละเอียดที่ต้องระวัง ทำถูกและมีทดสอบยืนยันแล้ว**:
+- Node's conditional fields (`service_point_code`/`department_*`/`is_active` เฉพาะ SERVICE_POINT, `device_code` เฉพาะ KIOSK) ถูก **เคลียร์เป็น null/blank จริงตอน submit** ไม่ใช่แค่ซ่อนในฟอร์ม — ทดสอบสร้าง node เป็น KIOSK ใส่ device_code แล้วแก้เป็น SERVICE_POINT จริง ยืนยันผ่าน `GET /api/facility/nodes/{id}` ว่า `device_code` กลายเป็น `null` และไม่โดน `Node.clean()` reject (ตรวจซ้ำเองอีกรอบ ยืนยันตรงกับที่ agent รายงาน)
+- TemplateStep prerequisite multiselect กรองเฉพาะ step ใน `pathway_template` เดียวกัน แบบ live เมื่อเปลี่ยน template
+- StaffUser password: required ตอน create, ตอน edit เว้นว่างไว้ = คงรหัสเดิม (ตรวจซ้ำเองในหน้า UI จริง เห็น help text "เว้นว่างไว้เพื่อคงรหัสผ่านเดิม" ถูกต้อง)
+- SERVICE_POINT-only FK select (TemplateStep/ServiceSchedule/ServicePointStaff's `service_point`) กรอง client-side จาก node list ที่ `node_type === "SERVICE_POINT"` เท่านั้น
+
+**ตรวจสอบอิสระ (ไม่ใช่แค่เชื่อ agent report)**: อ่านโค้ด `RecordFormSheet.tsx`/`DataTable.tsx`/`resource.ts` เอง, รัน `npx eslint .` + `npx next build` ซ้ำเองจาก clean cache ผ่านทั้งคู่, login ผ่าน browser จริงแล้วเช็ค Node KIOSK→SERVICE_POINT transition กับ StaffUser edit-form password behavior ด้วยตัวเอง ตรงกับที่ agent รายงานทุกจุด
+
+### Definition of Done — ผ่านแล้ว
 
 สร้าง/แก้ไข/ลบ Building, Floor, Node, Edge, CareCategory, PathwayTemplate, TemplateStep (รวม
 กำหนด prerequisite), ServiceSchedule, StaffUser, ServicePointStaff ได้จริงผ่านหน้า Admin
