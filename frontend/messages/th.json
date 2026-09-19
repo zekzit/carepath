@@ -1,0 +1,62 @@
+{
+  "common": {
+    "appName": "ระบบนำทางผู้ป่วย",
+    "hospitalName": "รพ. ตัวอย่าง"
+  },
+  "dev": {
+    "title": "Hackathon Starter",
+    "subtitle": "Next.js + Django + SQLite",
+    "backendStatusLabel": "สถานะ Backend",
+    "backendStatusLoading": "กำลังตรวจสอบ...",
+    "backendStatusOk": "เชื่อมต่อสำเร็จ",
+    "backendStatusError": "เชื่อมต่อไม่ได้ (เปิด Django server หรือยัง?)",
+    "portalsTitle": "Portals",
+    "openAdmin": "เปิด Admin Portal",
+    "openPatient": "ตัวอย่าง Patient Portal",
+    "openKiosk": "ตัวอย่าง Kiosk Portal",
+    "demoNote": "ลิงก์ Patient/Kiosk ด้านบนใช้ token/รหัสเครื่องตัวอย่างสำหรับพัฒนาเท่านั้น"
+  },
+  "admin": {
+    "breadcrumb": "Admin",
+    "dashboardTitle": "ภาพรวม",
+    "dashboardTitleEn": "Dashboard",
+    "statPatientsToday": "ผู้ป่วยวันนี้",
+    "statWaiting": "กำลังรอคิว",
+    "statAvgWait": "เวลารอเฉลี่ย",
+    "statAvgWaitValue": "18 นาที",
+    "statOpenPoints": "จุดบริการเปิด",
+    "placeholderTitle": "เนื้อหาหน้านี้อยู่ระหว่างพัฒนา",
+    "placeholderDescription": "Content placeholder — วางโครงเมนูก่อน ยังไม่ทำหน้านี้จริง",
+    "roleLegendTitle": "แสดงเมนูตามสิทธิ์",
+    "userRoleLabel": "ผู้ดูแลระบบ",
+    "notifications": "การแจ้งเตือน"
+  },
+  "patient": {
+    "greeting": "สวัสดีคุณ",
+    "hnLabel": "HN",
+    "appointmentLabel": "นัด",
+    "stepsTitle": "ขั้นตอนการรักษาของคุณ",
+    "stepDone": "เสร็จสิ้น",
+    "stepInProgress": "กำลังดำเนินการ",
+    "stepPending": "รอเริ่ม",
+    "parallelNote": "ทำคู่ขนานกันได้ · เลือกไปจุดไหนก่อนก็ได้",
+    "waitingPrereq": "รอขั้นตอนก่อนหน้าเสร็จ",
+    "nextStepTitle": "ขั้นตอนถัดไปของคุณ",
+    "walkTime": "เดิน ~{minutes} นาที",
+    "navigateCta": "นำทางไปจุดนี้",
+    "queueTitleAt": "คิวของคุณที่{location}",
+    "queueCalling": "กำลังเรียกคิว",
+    "queueRemaining": "อีกประมาณ {count} คิว · เวลารอโดยเฉลี่ย {minutes} นาที",
+    "footerNote": "หน้านี้เข้าถึงได้เฉพาะจาก QR Code ของคุณ ไม่ต้องเข้าสู่ระบบ"
+  },
+  "kiosk": {
+    "deviceLabel": "จุดคัดกรอง A · Kiosk {code}",
+    "idleTitleLine1": "สแกน QR Code",
+    "idleTitleLine2": "บนใบนัดของคุณ",
+    "idleAltHint": "หรือแตะหน้าจอเพื่อกรอกเลข HN",
+    "noLoginNote": "ไม่ต้องเข้าสู่ระบบ · จอสัมผัส",
+    "scanDemoCta": "จำลองการสแกนสำเร็จ (demo)",
+    "backToScanCta": "กลับไปหน้าสแกน",
+    "resetCta": "เสร็จแล้ว กลับสู่หน้าหลัก"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "common": {
+    "appName": "Patient Navigation System",
+    "hospitalName": "Sample Hospital"
+  },
+  "dev": {
+    "title": "Hackathon Starter",
+    "subtitle": "Next.js + Django + SQLite",
+    "backendStatusLabel": "Backend status",
+    "backendStatusLoading": "checking...",
+    "backendStatusOk": "connected",
+    "backendStatusError": "not reachable (is the Django server running?)",
+    "portalsTitle": "Portals",
+    "openAdmin": "Open Admin Portal",
+    "openPatient": "Sample Patient Portal",
+    "openKiosk": "Sample Kiosk Portal",
+    "demoNote": "The Patient/Kiosk links above use a placeholder token/device code for local development only."
+  },
+  "admin": {
+    "breadcrumb": "Admin",
+    "dashboardTitle": "Dashboard",
+    "dashboardTitleEn": "Dashboard",
+    "statPatientsToday": "Patients today",
+    "statWaiting": "Waiting",
+    "statAvgWait": "Avg. wait time",
+    "statAvgWaitValue": "18 min",
+    "statOpenPoints": "Service points open",
+    "placeholderTitle": "This page is under construction",
+    "placeholderDescription": "Content placeholder — navigation is scaffolded first, this page isn't built yet",
+    "roleLegendTitle": "Menu visibility by role",
+    "userRoleLabel": "Admin",
+    "notifications": "Notifications"
+  },
+  "patient": {
+    "greeting": "Hello,",
+    "hnLabel": "HN",
+    "appointmentLabel": "Appointment",
+    "stepsTitle": "Your care steps",
+    "stepDone": "Done",
+    "stepInProgress": "In progress",
+    "stepPending": "Not started",
+    "parallelNote": "Can be done in parallel · go to either one first",
+    "waitingPrereq": "Waiting on the previous step",
+    "nextStepTitle": "Your next step",
+    "walkTime": "~{minutes} min walk",
+    "navigateCta": "Navigate here",
+    "queueTitleAt": "Your queue at {location}",
+    "queueCalling": "Now serving",
+    "queueRemaining": "About {count} more · avg wait {minutes} min",
+    "footerNote": "This page is only reachable from your own QR code — no login needed"
+  },
+  "kiosk": {
+    "deviceLabel": "Screening Point A · Kiosk {code}",
+    "idleTitleLine1": "Scan the QR code",
+    "idleTitleLine2": "on your appointment slip",
+    "idleAltHint": "Or tap the screen to enter your HN",
+    "noLoginNote": "No login needed · Touchscreen",
+    "scanDemoCta": "Simulate a successful scan (demo)",
+    "backToScanCta": "Back to scan screen",
+    "resetCta": "Done — back to home screen"
+  }
+}

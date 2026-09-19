@@ -1,26 +1,45 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --brand-ink: #0f3733;
+  --brand-ink-soft: #1e7a6e;
+  --brand-teal: #2b9c8f;
+  --brand-amber: #e9ae45;
+  --brand-amber-ink: #3a2a05;
+
+  /* Role indicator colors (Admin Portal — see StaffRole in accounts app) */
+  --role-registrar: #e0a458;
+  --role-service-staff: #2b9c8f;
+  --role-executive: #8b7fd1;
+  --role-admin: #6fa8dc;
+
+  /* Neutrals */
+  --surface-app: #f3f6f5;
+  --surface-card: #ffffff;
+  --border-subtle: #e2e8e7;
+  --border-dashed: #c7d6d3;
+  --ink: #17252a;
+  --ink-muted: #5b6e6b;
+  --ink-faint: #8a9c99;
+
+  --font-sans: var(--font-ibm-plex-sans-thai);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-amber: var(--brand-amber);
+  --color-surface-app: var(--surface-app);
+  --color-surface-card: var(--surface-card);
+  --color-border-subtle: var(--border-subtle);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --font-sans: var(--font-sans);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface-app);
+  color: var(--ink);
+  font-family: var(--font-sans), sans-serif;
 }
