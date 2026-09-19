@@ -215,15 +215,15 @@ template อัตโนมัติ → เดินหน้าทีละ st
 
 ### Frontend
 
-- `KioskView` ตอนนี้มีปุ่ม demo "จำลองการสแกนสำเร็จ" ล้วน ๆ — สิ่งที่ต้องทำใน phase นี้คือเพิ่ม
-  **manual fallback**: ช่อง input กรอก **HN** (ไม่ใช่ qr_token ตามเหตุผลด้านบน) ที่ปุ่ม "หรือแตะหน้าจอเพื่อกรอกเลข HN"
-  (มี UI อยู่แล้วในมockup) ให้ยิง fetch จริงไปที่ `GET /api/visits/by-hn-today/{hn_code}`
+- [x] `KioskView.tsx` — ปุ่ม "หรือแตะหน้าจอเพื่อกรอกเลข HN" ตอนนี้เป็นปุ่มจริง เปิดหน้าจอกรอก HN (`ManualEntryScreen`) แยกจากปุ่ม demo เดิม (ปุ่ม demo ยังคงใช้ `demoVisit` mock ตามเดิม ไม่เปลี่ยน — เพื่อให้ยังมีทางทดสอบ UI แบบไม่ต้องพึ่งข้อมูลจริงในระบบ) กรอก HN แล้วยิง `fetchVisitByHnTodayClient()` (ใหม่ ใน `lib/api/public-visit.ts`) ไปที่ `GET /api/visits/by-hn-today/{hn_code}` เจอแล้วโชว์ผลแบบเดียวกับ demo, ไม่เจอแสดงข้อความ error อยู่หน้าเดิม (ไม่ crash)
 - การอ่านกล้อง/ถอดรหัส QR จริงในเบราว์เซอร์ **ไม่รวมอยู่ใน phase นี้** ย้ายไป **Phase 6** ทั้งหมด
 
-### Definition of Done
+**ตรวจสอบแล้ว** (ทำเอง ไม่ได้ผ่าน subagent เพราะ scope เล็กพอทำตรงได้ และเลี่ยงชนไฟล์ `messages/*.json` กับ Phase 5 ที่รันขนานกัน): `eslint`+`next build` clean, ทดสอบผ่าน browser จริง — กรอก HN ที่มีนัดวันนี้จริงเจอข้อมูลตรงกับ Patient Portal เป๊ะ (เลขคิว/current_number ตรงกัน), กรอก HN ที่ไม่มีนัดวันนี้ขึ้น error message ถูกต้อง ไม่ crash, reset กลับหน้าแรกได้ปกติ
 
-กรอก HN จริงที่หน้าจอ kiosk แล้วเห็นข้อมูล visit เดียวกับที่ patient portal เห็น (backend ผ่านแล้ว
-รอ frontend), กด "เสร็จแล้ว กลับสู่หน้าหลัก" reset กลับหน้าสแกนได้
+### Definition of Done — ผ่านแล้ว
+
+กรอก HN จริงที่หน้าจอ kiosk แล้วเห็นข้อมูล visit เดียวกับที่ patient portal เห็น, กด "เสร็จแล้ว
+กลับสู่หน้าหลัก" reset กลับหน้าสแกนได้
 
 ---
 
