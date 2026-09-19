@@ -186,7 +186,66 @@
     "addServicePointStaff": "เพิ่มการมอบหมาย",
     "editServicePointStaff": "แก้ไขการมอบหมาย",
     "servicePointStaffEmptyTitle": "ยังไม่มีการมอบหมายจุดบริการ",
-    "servicePointStaffEmptyDescription": "ผูกเจ้าหน้าที่เข้ากับจุดบริการที่รับผิดชอบ"
+    "servicePointStaffEmptyDescription": "ผูกเจ้าหน้าที่เข้ากับจุดบริการที่รับผิดชอบ",
+
+    "colVisitDate": "วันที่มารับบริการ",
+    "colStatus": "สถานะ",
+    "colHnCode": "HN",
+    "colDob": "วันเกิด",
+    "colNationalId": "เลขบัตรประชาชน",
+    "colPhone": "เบอร์โทร",
+    "colPreferredLanguage": "ภาษาที่ใช้แสดงผล",
+    "languageTh": "ไทย",
+    "languageEn": "English",
+
+    "visitStatus": {
+      "REGISTERED": "ลงทะเบียนแล้ว",
+      "IN_PROGRESS": "กำลังดำเนินการ",
+      "COMPLETED": "เสร็จสิ้น",
+      "CANCELLED": "ยกเลิก"
+    },
+    "visitStepStatus": {
+      "PENDING": "รอเริ่ม",
+      "IN_PROGRESS": "กำลังดำเนินการ",
+      "DONE": "เสร็จสิ้น",
+      "SKIPPED": "ข้ามขั้นตอน"
+    },
+    "ticketStatus": {
+      "WAITING": "รอเรียก",
+      "CALLED": "เรียกแล้ว",
+      "SERVING": "กำลังให้บริการ",
+      "DONE": "เสร็จสิ้น",
+      "SKIPPED": "ข้าม"
+    },
+
+    "registerVisit": "ลงทะเบียนผู้ป่วย",
+    "registerStepPatient": "ขั้นที่ 1 · ค้นหาหรือสร้างผู้ป่วย",
+    "registerStepVisit": "ขั้นที่ 2 · รายละเอียดการมารับบริการ",
+    "searchByHnPlaceholder": "ค้นหาด้วยเลข HN",
+    "noPatientFound": "ไม่พบผู้ป่วยที่ตรงกัน — สร้างผู้ป่วยใหม่ได้ด้านล่าง",
+    "createNewPatient": "สร้างผู้ป่วยใหม่",
+    "changePatient": "เปลี่ยนผู้ป่วย",
+    "visitsShowAll": "แสดงทุกวันที่",
+    "visitsEmptyTitle": "ยังไม่มีการมารับบริการ",
+    "visitsEmptyDescription": "ลงทะเบียนผู้ป่วยใหม่เพื่อเริ่มต้น",
+    "backToVisits": "← กลับไปหน้ารายการ",
+    "visitStepsEmpty": "แม่แบบเส้นทางนี้ยังไม่มีขั้นตอน",
+    "adHocStep": "เพิ่มนอกแผนเดิม",
+    "stepActionStart": "เริ่ม",
+    "stepActionComplete": "เสร็จสิ้น",
+    "stepActionSkip": "ข้าม",
+    "parallelGroupLabel": "ทำคู่ขนานกันได้",
+    "sequenceOrderLabel": "ลำดับขั้นตอน",
+
+    "noServicePoints": "ยังไม่มีจุดบริการในระบบ — เพิ่มที่หน้าผังสถานที่ก่อน",
+    "currentNumberLabel": "หมายเลขคิวปัจจุบัน",
+    "noQueueToday": "วันนี้ยังไม่มีคิวที่จุดนี้",
+    "callNextCta": "เรียกคิวถัดไป",
+    "noTicketsTitle": "ยังไม่มีคิวรอ",
+    "noTicketsDescription": "คิวจะปรากฏเมื่อมีการเริ่มขั้นตอนที่จุดบริการนี้",
+    "colTicketNumber": "หมายเลขคิว",
+    "ticketActionServe": "เริ่มให้บริการ",
+    "ticketActionDone": "เสร็จสิ้น"
   },
   "patient": {
     "greeting": "สวัสดีคุณ",

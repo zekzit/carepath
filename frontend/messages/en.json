@@ -186,7 +186,66 @@
     "addServicePointStaff": "Add assignment",
     "editServicePointStaff": "Edit assignment",
     "servicePointStaffEmptyTitle": "No assignments yet",
-    "servicePointStaffEmptyDescription": "Assign staff to the service points they cover."
+    "servicePointStaffEmptyDescription": "Assign staff to the service points they cover.",
+
+    "colVisitDate": "Visit date",
+    "colStatus": "Status",
+    "colHnCode": "HN",
+    "colDob": "Date of birth",
+    "colNationalId": "National ID",
+    "colPhone": "Phone",
+    "colPreferredLanguage": "Preferred language",
+    "languageTh": "Thai",
+    "languageEn": "English",
+
+    "visitStatus": {
+      "REGISTERED": "Registered",
+      "IN_PROGRESS": "In progress",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    },
+    "visitStepStatus": {
+      "PENDING": "Not started",
+      "IN_PROGRESS": "In progress",
+      "DONE": "Done",
+      "SKIPPED": "Skipped"
+    },
+    "ticketStatus": {
+      "WAITING": "Waiting",
+      "CALLED": "Called",
+      "SERVING": "Serving",
+      "DONE": "Done",
+      "SKIPPED": "Skipped"
+    },
+
+    "registerVisit": "Register visit",
+    "registerStepPatient": "Step 1 · Find or create patient",
+    "registerStepVisit": "Step 2 · Visit details",
+    "searchByHnPlaceholder": "Search by HN",
+    "noPatientFound": "No matching patient — create a new one below",
+    "createNewPatient": "Create new patient",
+    "changePatient": "Change patient",
+    "visitsShowAll": "Show all dates",
+    "visitsEmptyTitle": "No visits yet",
+    "visitsEmptyDescription": "Register a new visit to get started",
+    "backToVisits": "← Back to visit list",
+    "visitStepsEmpty": "This pathway template has no steps",
+    "adHocStep": "Added ad-hoc",
+    "stepActionStart": "Start",
+    "stepActionComplete": "Complete",
+    "stepActionSkip": "Skip",
+    "parallelGroupLabel": "Can run in parallel",
+    "sequenceOrderLabel": "Sequence",
+
+    "noServicePoints": "No service points configured yet — add one under Facility Map",
+    "currentNumberLabel": "Current number",
+    "noQueueToday": "No queue at this point yet today",
+    "callNextCta": "Call next",
+    "noTicketsTitle": "No tickets waiting",
+    "noTicketsDescription": "Tickets appear once a step is started at this service point",
+    "colTicketNumber": "Ticket #",
+    "ticketActionServe": "Serve",
+    "ticketActionDone": "Done"
   },
   "patient": {
     "greeting": "Hello,",

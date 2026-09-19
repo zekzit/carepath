@@ -1,5 +1,5 @@
-import { PlaceholderContent } from "@/components/admin/PlaceholderContent";
+import { QueueConsolePage } from "@/components/admin/queue/QueueConsolePage";
 
 export default function Page() {
-  return <PlaceholderContent />;
+  return <QueueConsolePage />;
 }
