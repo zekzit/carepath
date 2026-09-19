@@ -1,5 +1,5 @@
-import { PlaceholderContent } from "@/components/admin/PlaceholderContent";
+import { SettingsPage } from "@/components/admin/settings/SettingsPage";
 
 export default function Page() {
-  return <PlaceholderContent />;
+  return <SettingsPage />;
 }
