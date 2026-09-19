@@ -91,7 +91,12 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         icon: CalendarIcon,
         labelTh: "ตารางเวลาบริการ",
         labelEn: "Service Schedule",
-        roles: ["SERVICE_STAFF", "ADMIN"],
+        // ADMIN-only, matching the SRS API contract's Role column for
+        // /api/queues/service-schedules (see backend/queues/viewsets.py's
+        // ServiceScheduleViewSet, read_roles=()/write_roles=()) — SERVICE_STAFF
+        // used to see this link but got a 403 from every call, since the
+        // backend was always meant to be admin-managed opening-hours config.
+        roles: ["ADMIN"],
       },
       {
         id: "staff",
