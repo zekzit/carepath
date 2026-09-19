@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTranslations } from "next-intl";
 import { ADMIN_NAV_GROUPS } from "@/lib/admin-nav";
-import { ALL_STAFF_ROLES, ROLE_META } from "@/lib/roles";
+import { ROLE_META } from "@/lib/roles";
 import { MapPinIcon } from "@/components/icons";
 import type { CurrentStaffUser } from "@/lib/api/server";
 
@@ -17,7 +16,6 @@ function getInitials(name: string): string {
 
 export function Sidebar({ currentUser }: { currentUser: CurrentStaffUser }) {
   const pathname = usePathname();
-  const t = useTranslations("admin");
 
   return (
     <div className="flex w-[272px] shrink-0 flex-col bg-[var(--brand-ink)] text-[#eaf3f1]">
@@ -71,16 +69,6 @@ export function Sidebar({ currentUser }: { currentUser: CurrentStaffUser }) {
                       </div>
                       <div className="text-[10.5px] text-[#8fbdb5]">{item.labelEn}</div>
                     </div>
-                    <div className="flex gap-1">
-                      {item.roles.map((role) => (
-                        <span
-                          key={role}
-                          title={ROLE_META[role].labelEn}
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ background: ROLE_META[role].colorVar }}
-                        />
-                      ))}
-                    </div>
                   </Link>
                 );
               })}
@@ -88,16 +76,6 @@ export function Sidebar({ currentUser }: { currentUser: CurrentStaffUser }) {
           );
         })}
       </nav>
-
-      <div className="flex flex-col gap-1.5 border-t border-white/10 px-[22px] py-3.5">
-        <div className="mb-0.5 text-[10px] uppercase tracking-wide text-[#6fa098]">{t("roleLegendTitle")}</div>
-        {ALL_STAFF_ROLES.map((role) => (
-          <div key={role} className="flex items-center gap-2 text-[10.5px] text-[#9fc4be]">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: ROLE_META[role].colorVar }} />
-            {ROLE_META[role].labelTh} ({ROLE_META[role].labelEn})
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
