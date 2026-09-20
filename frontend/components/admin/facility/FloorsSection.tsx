@@ -31,6 +31,9 @@ export function FloorsSection({
   const t = useTranslations("admin");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Floor | null>(null);
+  const [buildingFilter, setBuildingFilter] = useState("");
+
+  const visibleFloors = buildingFilter ? floors.filter((f) => String(f.building) === buildingFilter) : floors;
 
   function buildingLabel(buildingId: number): string {
     const building = buildings.find((b) => b.id === buildingId);
@@ -95,13 +98,29 @@ export function FloorsSection({
     await refetch();
   }
 
+  const filters = (
+    <select
+      value={buildingFilter}
+      onChange={(event) => setBuildingFilter(event.target.value)}
+      className="rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand-teal)]"
+    >
+      <option value="">{t("filterAllOption")}</option>
+      {buildings.map((b) => (
+        <option key={b.id} value={String(b.id)}>
+          {`${b.code} · ${b.name_th}`}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
     <>
       <DataTable
         columns={columns}
-        rows={floors}
+        rows={visibleFloors}
         rowKey={(row) => row.id}
         loading={loading}
+        filters={filters}
         addLabel={t("addFloor")}
         onAdd={openCreate}
         onEdit={openEdit}

@@ -108,6 +108,11 @@
     "fieldRequired": "กรุณากรอกข้อมูลนี้",
     "active": "เปิดใช้งาน",
     "inactive": "ปิดใช้งาน",
+    "filterAllOption": "ทั้งหมด",
+    "filterStatus": "สถานะ",
+    "nodesSearchPlaceholder": "ค้นหาชื่อ, แผนก หรือรหัสจุดบริการ",
+    "edgesSearchPlaceholder": "ค้นหาชื่อจุดต้นทางหรือปลายทาง",
+    "pathwayTemplatesSearchPlaceholder": "ค้นหาชื่อแม่แบบ",
 
     "colNameTh": "ชื่อ (ไทย)",
     "colNameEn": "ชื่อ (อังกฤษ)",

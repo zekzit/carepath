@@ -29,6 +29,11 @@ export function TemplateStepsSection({
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<TemplateStep | null>(null);
+  const [templateFilter, setTemplateFilter] = useState("");
+
+  const visibleSteps = templateFilter
+    ? steps.filter((s) => String(s.pathway_template) === templateFilter)
+    : steps;
 
   async function refetch() {
     setLoading(true);
@@ -157,13 +162,29 @@ export function TemplateStepsSection({
     await refetch();
   }
 
+  const filters = (
+    <select
+      value={templateFilter}
+      onChange={(event) => setTemplateFilter(event.target.value)}
+      className="rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand-teal)]"
+    >
+      <option value="">{t("filterAllOption")}</option>
+      {pathwayTemplates.map((p) => (
+        <option key={p.id} value={String(p.id)}>
+          {p.name_th}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
     <>
       <DataTable
         columns={columns}
-        rows={steps}
+        rows={visibleSteps}
         rowKey={(row) => row.id}
         loading={loading}
+        filters={filters}
         addLabel={t("addTemplateStep")}
         onAdd={openCreate}
         onEdit={openEdit}

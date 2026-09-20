@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { RecordFormSheet, type FieldConfig, type FormValues } from "@/components/admin/RecordFormSheet";
+import { SearchInput } from "@/components/admin/SearchInput";
 import { EDGE_TYPES, edgesApi, type EdgeType, type FacilityEdge, type FacilityNode } from "@/lib/api/facility";
 import { bool, id, int, optionalNum, str } from "@/lib/admin-form-utils";
 
@@ -33,6 +34,8 @@ export function EdgesSection({
   const t = useTranslations("admin");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<FacilityEdge | null>(null);
+  const [edgeTypeFilter, setEdgeTypeFilter] = useState<EdgeType | "">("");
+  const [search, setSearch] = useState("");
 
   function nodeLabel(nodeId: number): string {
     const node = nodes.find((n) => n.id === nodeId);
@@ -41,6 +44,16 @@ export function EdgesSection({
 
   const nodeOptions = nodes.map((n) => ({ value: String(n.id), label: n.name_th }));
   const edgeTypeLabel = (type: EdgeType) => t(`edgeType.${type}` as const);
+
+  const needle = search.trim().toLowerCase();
+  const visibleEdges = edges.filter((edge) => {
+    if (edgeTypeFilter && edge.edge_type !== edgeTypeFilter) return false;
+    if (needle) {
+      const haystack = `${nodeLabel(edge.from_node)} ${nodeLabel(edge.to_node)}`.toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  });
 
   const fields: FieldConfig[] = [
     { name: "from_node", label: t("colFromNode"), type: "select", required: true, options: nodeOptions },
@@ -104,13 +117,32 @@ export function EdgesSection({
     await refetch();
   }
 
+  const filters = (
+    <>
+      <select
+        value={edgeTypeFilter}
+        onChange={(event) => setEdgeTypeFilter(event.target.value as EdgeType | "")}
+        className="rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand-teal)]"
+      >
+        <option value="">{t("filterAllOption")}</option>
+        {EDGE_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {edgeTypeLabel(type)}
+          </option>
+        ))}
+      </select>
+      <SearchInput value={search} onChange={setSearch} placeholder={t("edgesSearchPlaceholder")} />
+    </>
+  );
+
   return (
     <>
       <DataTable
         columns={columns}
-        rows={edges}
+        rows={visibleEdges}
         rowKey={(row) => row.id}
         loading={loading}
+        filters={filters}
         addLabel={t("addEdge")}
         onAdd={openCreate}
         onEdit={openEdit}

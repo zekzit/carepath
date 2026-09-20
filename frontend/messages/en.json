@@ -108,6 +108,11 @@
     "fieldRequired": "This field is required",
     "active": "Active",
     "inactive": "Inactive",
+    "filterAllOption": "All",
+    "filterStatus": "Status",
+    "nodesSearchPlaceholder": "Search name, department, or service point code",
+    "edgesSearchPlaceholder": "Search from/to node name",
+    "pathwayTemplatesSearchPlaceholder": "Search template name",
 
     "colNameTh": "Name (Thai)",
     "colNameEn": "Name (English)",

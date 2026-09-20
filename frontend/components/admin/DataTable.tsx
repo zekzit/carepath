@@ -31,6 +31,9 @@ type DataTableProps<T> = {
   rows: T[];
   rowKey: (row: T) => string | number;
   loading?: boolean;
+  /** Optional filter controls (dropdowns/search) rendered on the same row as
+   *  the "add" button, to its left. */
+  filters?: ReactNode;
   addLabel: string;
   onAdd: () => void;
   onEdit: (row: T) => void;
@@ -57,6 +60,7 @@ export function DataTable<T>({
   rows,
   rowKey,
   loading = false,
+  filters,
   addLabel,
   onAdd,
   onEdit,
@@ -86,7 +90,8 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-1 flex-wrap items-center gap-2">{filters}</div>
         <button
           type="button"
           onClick={onAdd}

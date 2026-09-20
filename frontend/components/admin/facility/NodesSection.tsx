@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import QRCode from "qrcode";
 import { DataTable, type DataTableColumn, type DataTableExtraAction } from "@/components/admin/DataTable";
 import { RecordFormSheet, type FieldConfig, type FormValues } from "@/components/admin/RecordFormSheet";
+import { SearchInput } from "@/components/admin/SearchInput";
 import { NODE_TYPES, nodesApi, type Building, type FacilityNode, type Floor, type NodeType } from "@/lib/api/facility";
 import { bool, num, optionalStr, str } from "@/lib/admin-form-utils";
 import type { AppLocale } from "@/i18n/locales";
@@ -46,6 +47,10 @@ export function NodesSection({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<FacilityNode | null>(null);
   const [qrNode, setQrNode] = useState<FacilityNode | null>(null);
+  const [buildingFilter, setBuildingFilter] = useState("");
+  const [floorFilter, setFloorFilter] = useState("");
+  const [nodeTypeFilter, setNodeTypeFilter] = useState<NodeType | "">("");
+  const [search, setSearch] = useState("");
 
   const nodeTypeLabel = (type: NodeType) => t(`nodeType.${type}` as const);
 
@@ -57,6 +62,35 @@ export function NodesSection({
     const buildingCode = building ? building.code : "?";
     return `${buildingCode} · ${floorName} (L${floor.level_no})`;
   }
+
+  const floorOptions = buildingFilter
+    ? floors.filter((f) => String(f.building) === buildingFilter)
+    : floors;
+
+  const needle = search.trim().toLowerCase();
+  const visibleNodes = nodes.filter((node) => {
+    if (buildingFilter) {
+      const floor = floors.find((f) => f.id === node.floor);
+      if (!floor || String(floor.building) !== buildingFilter) return false;
+    }
+    if (floorFilter && String(node.floor) !== floorFilter) return false;
+    if (nodeTypeFilter && node.node_type !== nodeTypeFilter) return false;
+    if (needle) {
+      const haystack = [
+        node.name_th,
+        node.name_en,
+        node.department_th,
+        node.department_en,
+        node.service_point_code,
+        node.device_code,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  });
 
   const fields: FieldConfig[] = [
     {
@@ -188,13 +222,58 @@ export function NodesSection({
     },
   ];
 
+  const selectClass =
+    "rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand-teal)]";
+
+  const filters = (
+    <>
+      <select
+        value={buildingFilter}
+        onChange={(event) => {
+          setBuildingFilter(event.target.value);
+          setFloorFilter("");
+        }}
+        className={selectClass}
+      >
+        <option value="">{t("filterAllOption")}</option>
+        {buildings.map((b) => (
+          <option key={b.id} value={String(b.id)}>
+            {`${b.code} · ${b.name_th}`}
+          </option>
+        ))}
+      </select>
+      <select value={floorFilter} onChange={(event) => setFloorFilter(event.target.value)} className={selectClass}>
+        <option value="">{t("filterAllOption")}</option>
+        {floorOptions.map((f) => (
+          <option key={f.id} value={String(f.id)}>
+            {floorLabel(f.id)}
+          </option>
+        ))}
+      </select>
+      <select
+        value={nodeTypeFilter}
+        onChange={(event) => setNodeTypeFilter(event.target.value as NodeType | "")}
+        className={selectClass}
+      >
+        <option value="">{t("filterAllOption")}</option>
+        {NODE_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {nodeTypeLabel(type)}
+          </option>
+        ))}
+      </select>
+      <SearchInput value={search} onChange={setSearch} placeholder={t("nodesSearchPlaceholder")} />
+    </>
+  );
+
   return (
     <>
       <DataTable
         columns={columns}
-        rows={nodes}
+        rows={visibleNodes}
         rowKey={(row) => row.id}
         loading={loading}
+        filters={filters}
         addLabel={t("addNode")}
         onAdd={openCreate}
         onEdit={openEdit}

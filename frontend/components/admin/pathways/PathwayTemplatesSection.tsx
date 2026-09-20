@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { RecordFormSheet, type FieldConfig, type FormValues } from "@/components/admin/RecordFormSheet";
+import { SearchInput } from "@/components/admin/SearchInput";
 import { pathwayTemplatesApi, type CareCategory, type PathwayTemplate } from "@/lib/api/pathway";
 import { bool, id, str } from "@/lib/admin-form-utils";
 
@@ -30,11 +31,23 @@ export function PathwayTemplatesSection({
   const t = useTranslations("admin");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PathwayTemplate | null>(null);
+  const [careCategoryFilter, setCareCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
+  const [search, setSearch] = useState("");
 
   function careCategoryLabel(categoryId: number): string {
     const category = careCategories.find((c) => c.id === categoryId);
     return category ? category.name_th : `#${categoryId}`;
   }
+
+  const needle = search.trim().toLowerCase();
+  const visibleTemplates = pathwayTemplates.filter((template) => {
+    if (careCategoryFilter && String(template.care_category) !== careCategoryFilter) return false;
+    if (statusFilter === "active" && !template.is_active) return false;
+    if (statusFilter === "inactive" && template.is_active) return false;
+    if (needle && !`${template.name_th} ${template.name_en}`.toLowerCase().includes(needle)) return false;
+    return true;
+  });
 
   const fields: FieldConfig[] = [
     {
@@ -87,13 +100,41 @@ export function PathwayTemplatesSection({
     await refetch();
   }
 
+  const filters = (
+    <>
+      <select
+        value={careCategoryFilter}
+        onChange={(event) => setCareCategoryFilter(event.target.value)}
+        className="rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand-teal)]"
+      >
+        <option value="">{t("filterAllOption")}</option>
+        {careCategories.map((c) => (
+          <option key={c.id} value={String(c.id)}>
+            {c.name_th}
+          </option>
+        ))}
+      </select>
+      <select
+        value={statusFilter}
+        onChange={(event) => setStatusFilter(event.target.value as "" | "active" | "inactive")}
+        className="rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand-teal)]"
+      >
+        <option value="">{t("filterAllOption")}</option>
+        <option value="active">{t("active")}</option>
+        <option value="inactive">{t("inactive")}</option>
+      </select>
+      <SearchInput value={search} onChange={setSearch} placeholder={t("pathwayTemplatesSearchPlaceholder")} />
+    </>
+  );
+
   return (
     <>
       <DataTable
         columns={columns}
-        rows={pathwayTemplates}
+        rows={visibleTemplates}
         rowKey={(row) => row.id}
         loading={loading}
+        filters={filters}
         addLabel={t("addPathwayTemplate")}
         onAdd={openCreate}
         onEdit={openEdit}
