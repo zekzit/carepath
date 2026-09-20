@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentStaffUser } from "@/lib/api/server";
 import { LoginForm } from "@/components/admin/LoginForm";
+
+export const metadata: Metadata = {
+  title: "Admin Portal",
+};
 
 // Deliberately outside app/admin/(authenticated)/ — that route group's
 // layout gates on being logged in, which would otherwise redirect this

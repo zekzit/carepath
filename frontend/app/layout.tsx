@@ -11,7 +11,10 @@ const ibmPlexSansThai = IBM_Plex_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "ระบบนำทางผู้ป่วย",
+  title: {
+    template: "CarePath - %s",
+    default: "CarePath",
+  },
   description: "Patient navigation system — Admin / Patient / Kiosk portals",
 };
 
