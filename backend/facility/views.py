@@ -193,6 +193,8 @@ def location_node_by_qr(request, qr_code):
                         "to_floor_id": serializers.IntegerField(),
                         "to_floor_name_th": serializers.CharField(),
                         "to_floor_name_en": serializers.CharField(),
+                        "to_pos_x": serializers.FloatField(),
+                        "to_pos_y": serializers.FloatField(),
                     },
                 ),
             },
@@ -266,6 +268,8 @@ def route_between_nodes(request):
                 "to_floor_id": to_node.floor_id,
                 "to_floor_name_th": to_node.floor.name_th,
                 "to_floor_name_en": to_node.floor.name_en,
+                "to_pos_x": to_node.pos_x,
+                "to_pos_y": to_node.pos_y,
             }
         )
 

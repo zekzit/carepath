@@ -164,6 +164,8 @@ export type RouteLeg = {
   to_floor_id: number;
   to_floor_name_th: string;
   to_floor_name_en: string;
+  to_pos_x: number;
+  to_pos_y: number;
 };
 
 export type RouteResult = {

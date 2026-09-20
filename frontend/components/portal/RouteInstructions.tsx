@@ -6,13 +6,13 @@
 // wheelchair-aware) from the backend and renders it as a numbered list of
 // plain-language steps.
 //
-// Graceful degradation: when the backend has no route data for this pair
-// (network hiccup, or the graph genuinely has no path — `reachable: false`),
-// this component renders nothing and reports `available: false` via
-// `onRouteAvailable`, so the caller (NextStepOptionsList.tsx / KioskView.tsx)
-// keeps showing the existing DirectionBlock compass as the fallback. When a
-// real route comes back, it reports `available: true` so the caller can
-// stop rendering the compass and let these turn-by-turn steps be primary.
+// Reports the fetched RouteResult back to the caller (NextStepOptionsList.tsx)
+// via `onRouteResult`, so the caller can point its DirectionBlock compass at
+// the route's first leg (the next node to walk to) instead of the final
+// destination. When the backend has no route data for this pair (network
+// hiccup, or the graph genuinely has no path — `reachable: false`), this
+// component renders nothing and the caller falls back to the straight-line
+// destination for the compass.
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -29,13 +29,12 @@ type RouteInstructionsProps = {
   wheelchair: boolean;
   scale?: "default" | "kiosk";
   /**
-   * Called every time a fetch resolves: `true` once a usable route
-   * (reachable, with at least one leg) is available, `false` otherwise
-   * (still loading, unreachable, same-point, or the request failed). Lets
-   * the caller decide whether to keep the DirectionBlock compass fallback
-   * visible alongside/instead of this component.
+   * Called every time a fetch resolves, with the raw RouteResult (or null
+   * if the request failed). Lets the caller read `legs[0]` for its own
+   * purposes (e.g. pointing a compass at the next node) independently of
+   * whether this component renders anything.
    */
-  onRouteAvailable?: (available: boolean) => void;
+  onRouteResult?: (result: RouteResult | null) => void;
 };
 
 export function RouteInstructions({
@@ -43,7 +42,7 @@ export function RouteInstructions({
   destinationNodeId,
   wheelchair,
   scale = "default",
-  onRouteAvailable,
+  onRouteResult,
 }: RouteInstructionsProps) {
   const t = useTranslations("patient.route");
   const locale = useLocale() as AppLocale;
@@ -54,12 +53,12 @@ export function RouteInstructions({
     fetchRouteClient(originNodeId, destinationNodeId, wheelchair).then((res) => {
       if (cancelled) return;
       setResult(res);
-      onRouteAvailable?.(Boolean(res && res.reachable && res.legs.length > 0));
+      onRouteResult?.(res);
     });
     return () => {
       cancelled = true;
     };
-    // onRouteAvailable is expected to be a stable callback from the caller;
+    // onRouteResult is expected to be a stable callback from the caller;
     // only re-fetch when the actual route inputs change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [originNodeId, destinationNodeId, wheelchair]);

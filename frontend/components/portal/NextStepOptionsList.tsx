@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { AppLocale } from "@/i18n/locales";
+import type { RouteLeg, RouteResult } from "@/lib/api/facility";
 import type { PublicVisitNextStepOption } from "@/lib/api/public-visit";
 import { serviceStepLocationName } from "@/lib/api/public-visit";
 import { computeDirection, type NodePosition } from "@/lib/direction";
@@ -10,6 +11,24 @@ import { DirectionBlock } from "./DirectionBlock";
 import { NextStepCard } from "./NextStepCard";
 import { QueueWidget } from "./QueueWidget";
 import { RouteInstructions } from "./RouteInstructions";
+
+// The compass now points at the *next node* to walk to (the first leg of
+// the routed path) rather than the final service point — matches the
+// turn-by-turn instructions above it instead of a straight line clean
+// across the building. Falls back to the final destination when no route
+// data is available yet (or the graph has no path), same as before.
+function nextNodePosition(route: RouteResult | null): NodePosition | null {
+  if (!route || !route.reachable || route.legs.length === 0) return null;
+  const leg: RouteLeg = route.legs[0];
+  return {
+    pos_x: leg.to_pos_x,
+    pos_y: leg.to_pos_y,
+    floor_id: leg.to_floor_id,
+    floor_scale_m_per_px: null,
+    floor_name_th: leg.to_floor_name_th,
+    floor_name_en: leg.to_floor_name_en,
+  };
+}
 
 // Renders the patient's eligible next-step options for both the Patient
 // Portal and the Kiosk Portal. Two layouts:
@@ -82,12 +101,12 @@ function SingleOption({
 }) {
   const scale: "default" | "kiosk" = variant === "kiosk" ? "kiosk" : "default";
   const locale = useLocale() as AppLocale;
-  const direction = origin ? computeDirection(origin, option.service_point) : null;
-  // Once the routing engine returns a real turn-by-turn route, it becomes
-  // the primary content and the straight-line compass fallback is hidden —
-  // the compass stays as graceful degradation for when no route data is
-  // available (offline, or the graph genuinely has no path).
-  const [routeAvailable, setRouteAvailable] = useState(false);
+  // Shown whenever `origin` is known — for the Patient Portal that's right
+  // after scanning a location QR (null beforehand), for the Kiosk it's
+  // always known (fixed device position).
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const compassTarget = nextNodePosition(route) ?? option.service_point;
+  const direction = origin ? computeDirection(origin, compassTarget) : null;
   // DirectionBlock's default title is kiosk copy ("Direction from kiosk") —
   // the Patient Portal overrides it with patient-specific copy ("Direction
   // from where you stand") since the origin is the patient's scanned
@@ -104,13 +123,13 @@ function SingleOption({
           destinationNodeId={option.service_point.id}
           wheelchair={wheelchair}
           scale={scale}
-          onRouteAvailable={setRouteAvailable}
+          onRouteResult={setRoute}
         />
       )}
-      {direction && !routeAvailable && (
+      {direction && (
         <DirectionBlock
           direction={direction}
-          destination={option.service_point}
+          destination={compassTarget}
           locale={locale}
           scale={scale}
           title={directionTitle}
@@ -152,22 +171,22 @@ function ParallelOptionCard({
   const isKiosk = variant === "kiosk";
   const location = serviceStepLocationName(option, locale);
   const floorName = locale === "th" ? option.service_point.floor_name_th : option.service_point.floor_name_en;
-  const direction = origin ? computeDirection(origin, option.service_point) : null;
-  const [routeAvailable, setRouteAvailable] = useState(false);
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const compassTarget = nextNodePosition(route) ?? option.service_point;
+  const direction = origin ? computeDirection(origin, compassTarget) : null;
+  const compassFloorName = locale === "th" ? compassTarget.floor_name_th : compassTarget.floor_name_en;
 
   const containerPadding = isKiosk ? "p-[18px]" : "p-4";
   const titleSize = isKiosk ? "text-[16px]" : "text-[15px]";
   const metaSize = isKiosk ? "text-[13px]" : "text-[12px]";
 
   // Bearing text — mirrors DirectionBlock's three states (different floor,
-  // at point, normal) so the per-option card carries the same info the
-  // single-option DirectionBlock does, just without the SVG compass. Hidden
-  // once a real turn-by-turn route is available (below) — that becomes the
-  // primary content, this stays only as the graceful-degradation fallback.
+  // at point, normal), pointed at the next node in the routed path (falling
+  // back to the final destination when no route data is available yet).
   const bearingText = (() => {
-    if (!direction || routeAvailable) return null;
+    if (!direction) return null;
     if (!direction.same_floor) {
-      return { label: `→ ${floorName}`, color: "text-[#9fc4be]" };
+      return { label: `→ ${compassFloorName}`, color: "text-[#9fc4be]" };
     }
     if (direction.at_point) {
       return { label: t("scanLocationCta"), color: "text-[#9fc4be]" };
@@ -197,7 +216,7 @@ function ParallelOptionCard({
           destinationNodeId={option.service_point.id}
           wheelchair={wheelchair}
           scale={isKiosk ? "kiosk" : "default"}
-          onRouteAvailable={setRouteAvailable}
+          onRouteResult={setRoute}
         />
       )}
       {ticket ? (
