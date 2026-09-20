@@ -408,9 +408,10 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
             "gets the new step ADDED to its existing prerequisites (never "
             "replacing them), so existing ordering is only tightened, never "
             "broken. `sequence_order` for every other step in the visit at "
-            "or after the insertion point is bumped by 1 for display "
-            "purposes only — `prerequisite_steps` is what actually enforces "
-            "ordering. The new step starts with `is_next=False`; it becomes "
+            "or after the insertion point — and for any `insert_before_step_ids` "
+            "target that was sequenced earlier (e.g. on another branch) — is "
+            "adjusted for display purposes only; `prerequisite_steps` is what "
+            "actually enforces ordering. The new step starts with `is_next=False`; it becomes "
             "designable the moment `{id}`'s step is completed/skipped, via "
             "that action's `next_step_ids` mechanism, with no special-case "
             "wiring needed. See GAP.md FR-20."
@@ -495,6 +496,25 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
                 is_planned=False,
             )
             new_step.prerequisite_steps.set([current_step])
+
+            # A step named in insert_before_step_ids that was already
+            # sequenced at or before the insertion point (e.g. it sits on a
+            # different branch than current_step) didn't get touched by the
+            # bump above. Left alone it would still render ahead of the new
+            # step in the timeline even though it now has to wait for it, so
+            # push its display order past new_step too.
+            out_of_order_targets = sorted(
+                (t for t in insert_before_steps if t.sequence_order <= new_step.sequence_order),
+                key=lambda t: t.sequence_order,
+            )
+            next_order = new_step.sequence_order + 1
+            for target in out_of_order_targets:
+                VisitStep.objects.filter(visit=visit, sequence_order__gte=next_order).update(
+                    sequence_order=F("sequence_order") + 1
+                )
+                target.sequence_order = next_order
+                target.save(update_fields=["sequence_order"])
+                next_order += 1
 
             for target in insert_before_steps:
                 target.prerequisite_steps.add(new_step)
