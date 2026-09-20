@@ -71,7 +71,6 @@ export function VisitQrCodeButton({
   <img src="${qrDataUrl}" alt="QR" />
   <div class="link-label">${escapeHtml(t("printQrLinkLabel"))}</div>
   <div class="link">${escapeHtml(link)}</div>
-  <script>window.onload = function () { window.print(); };</script>
 </body>
 </html>`);
       printWindow.document.close();
