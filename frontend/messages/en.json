@@ -365,7 +365,9 @@
     "noTicketsDescription": "Tickets appear once a step is started at this service point",
     "colTicketNumber": "Ticket #",
     "ticketActionServe": "Serve",
-    "ticketActionDone": "Done"
+    "ticketActionDone": "Done",
+    "incomingPatientsTitle": "Patients heading to this service point",
+    "pullInCta": "Pull in"
   },
   "patient": {
     "greeting": "Hello,",

@@ -13,7 +13,15 @@ import {
   type Queue,
   type QueueTicket,
 } from "@/lib/api/queues";
-import { listVisitSteps, patientsApi, visitsApi, type Patient, type Visit, type VisitStep } from "@/lib/api/visits";
+import {
+  listVisitSteps,
+  patientsApi,
+  startVisitStep,
+  visitsApi,
+  type Patient,
+  type Visit,
+  type VisitStep,
+} from "@/lib/api/visits";
 
 function detailFromError(err: unknown): string | null {
   if (err instanceof ApiError && err.body && typeof err.body === "object" && "detail" in err.body) {
@@ -106,11 +114,42 @@ export function QueueConsolePage() {
     };
   }, [selectedServicePointId]);
 
-  function patientNameForTicket(ticket: QueueTicket): string {
-    const step = visitSteps.find((s) => s.id === ticket.visit_step);
-    const visit = step ? visits.find((v) => v.id === step.visit) : undefined;
+  function patientNameForVisitId(visitId: number): string {
+    const visit = visits.find((v) => v.id === visitId);
     const patient = visit ? patients.find((p) => p.id === visit.patient) : undefined;
     return patient ? `${patient.full_name} (HN ${patient.hn_code})` : "—";
+  }
+
+  function patientNameForTicket(ticket: QueueTicket): string {
+    const step = visitSteps.find((s) => s.id === ticket.visit_step);
+    return step ? patientNameForVisitId(step.visit) : "—";
+  }
+
+  // Steps staff has already designated (is_next) as heading to this service
+  // point but that haven't been started yet — no QueueTicket exists for these
+  // yet, so they're invisible in the ticket table below. Surfacing them here
+  // lets staff pull a patient in as soon as they physically arrive, instead of
+  // hunting for them in the Visits list.
+  const incomingSteps = selectedServicePointId == null
+    ? []
+    : visitSteps
+        .filter((step) => step.service_point === selectedServicePointId && step.status === "PENDING" && step.is_next)
+        .slice()
+        .sort((a, b) => patientNameForVisitId(a.visit).localeCompare(patientNameForVisitId(b.visit)));
+
+  async function handlePullIn(stepId: number) {
+    if (selectedServicePointId == null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await startVisitStep(stepId);
+      await refetchQueueData(selectedServicePointId);
+      await refreshLookups();
+    } catch (err) {
+      setError(detailFromError(err) ?? t("formGenericError"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function refreshLookups() {
@@ -195,6 +234,39 @@ export function QueueConsolePage() {
           </div>
 
           {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-[12.5px] text-red-700">{error}</div>}
+
+          {!loading && incomingSteps.length > 0 && (
+            <div className="overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--surface-card)]">
+              <div className="border-b border-[var(--border-subtle)] px-4 py-3 text-[13px] font-semibold text-[var(--ink)]">
+                {t("incomingPatientsTitle")}
+              </div>
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-[11px] uppercase tracking-wide text-[var(--ink-faint)]">
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold">{t("colFullName")}</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right font-semibold">{t("actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incomingSteps.map((step) => (
+                    <tr key={step.id} className="border-b border-[var(--border-subtle)] last:border-0">
+                      <td className="px-4 py-3">{patientNameForVisitId(step.visit)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => handlePullIn(step.id)}
+                          className="rounded-md bg-[var(--brand-teal)] px-2.5 py-1 text-[11.5px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {t("pullInCta")}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2.5 rounded-[14px] border-[1.5px] border-dashed border-[var(--border-dashed)] bg-[var(--surface-card)] py-16 text-[#8a9c99]">

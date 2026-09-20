@@ -365,7 +365,9 @@
     "noTicketsDescription": "คิวจะปรากฏเมื่อมีการเริ่มขั้นตอนที่จุดบริการนี้",
     "colTicketNumber": "หมายเลขคิว",
     "ticketActionServe": "เริ่มให้บริการ",
-    "ticketActionDone": "เสร็จสิ้น"
+    "ticketActionDone": "เสร็จสิ้น",
+    "incomingPatientsTitle": "รายชื่อที่กำลังจะมาถึงจุดนี้",
+    "pullInCta": "ดึงเข้าคิว"
   },
   "patient": {
     "greeting": "สวัสดีคุณ",
