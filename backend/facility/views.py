@@ -20,6 +20,52 @@ _SCANNABLE_NODE_TYPES = (
 
 
 @extend_schema(
+    summary="List every kiosk terminal",
+    description=(
+        "Public, permanent `AllowAny` — the device-picker page at "
+        "`/kiosk` (frontend) has no staff session of its own (a kiosk "
+        "terminal identifies itself by `device_code`, not by login) and "
+        "needs to list every `KIOSK` node so a staffer can pick which "
+        "terminal to open. `NodeViewSet` (`GET /api/facility/nodes`) "
+        "can't be reused here: it sits behind `RoleRequired`, which "
+        "rejects unauthenticated requests outright regardless of role. "
+        "This endpoint exposes only `KIOSK` nodes, not the full graph."
+    ),
+    responses=inline_serializer(
+        name="KioskListItemResponse",
+        many=True,
+        fields={
+            "device_code": serializers.CharField(),
+            "name_th": serializers.CharField(),
+            "name_en": serializers.CharField(),
+            "floor_id": serializers.IntegerField(),
+            "is_active": serializers.BooleanField(),
+        },
+    ),
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def list_kiosks(request):
+    """Public, permanent AllowAny — see schema description above."""
+    nodes = Node.objects.filter(
+        node_type=Node.NodeType.KIOSK,
+        device_code__isnull=False,
+    ).order_by("name_en")
+    return Response(
+        [
+            {
+                "device_code": node.device_code,
+                "name_th": node.name_th,
+                "name_en": node.name_en,
+                "floor_id": node.floor_id,
+                "is_active": node.is_active,
+            }
+            for node in nodes
+        ]
+    )
+
+
+@extend_schema(
     summary="Resolve a kiosk by its device_code",
     description=(
         "Public, permanent `AllowAny` — a kiosk terminal identifies itself "

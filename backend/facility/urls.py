@@ -13,6 +13,7 @@ router.register("nodes", NodeViewSet, basename="node")
 router.register("edges", EdgeViewSet, basename="edge")
 
 urlpatterns = [
+    path("kiosks", views.list_kiosks, name="list-kiosks"),
     path("kiosks/<str:device_code>", views.kiosk_by_device_code, name="kiosk-by-device-code"),
     path("nodes/by-location-qr/<str:qr_code>", views.location_node_by_qr, name="location-node-by-qr"),
     path("route", views.route_between_nodes, name="route-between-nodes"),
