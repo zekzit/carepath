@@ -18,10 +18,12 @@ import {
   patientsApi,
   startVisitStep,
   visitsApi,
+  type EligibleNextStepsError,
   type Patient,
   type Visit,
   type VisitStep,
 } from "@/lib/api/visits";
+import { DesignateNextStepModal } from "@/components/admin/visits/DesignateNextStepModal";
 
 function detailFromError(err: unknown): string | null {
   if (err instanceof ApiError && err.body && typeof err.body === "object" && "detail" in err.body) {
@@ -29,6 +31,24 @@ function detailFromError(err: unknown): string | null {
   }
   return null;
 }
+
+function isEligibleNextStepsError(err: unknown): err is ApiError & { body: EligibleNextStepsError } {
+  return (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    !!err.body &&
+    typeof err.body === "object" &&
+    Array.isArray((err.body as Record<string, unknown>).eligible_next_steps)
+  );
+}
+
+/** Pending "done" ticket call waiting on staff to designate which
+ * newly-unlocked follow-up step(s) (from the 409's eligible_next_steps) the
+ * patient goes to next — see DesignateNextStepModal. */
+type PendingDesignation = {
+  ticketId: number;
+  options: EligibleNextStepsError["eligible_next_steps"];
+};
 
 async function fetchLookupData() {
   // Cross-reference data for "whose ticket is this" (visit_step -> visit ->
@@ -54,6 +74,9 @@ export function QueueConsolePage() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDesignation, setPendingDesignation] = useState<PendingDesignation | null>(null);
+  const [designateBusy, setDesignateBusy] = useState(false);
+  const [designateError, setDesignateError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +214,45 @@ export function QueueConsolePage() {
     }
   }
 
+  async function handleDone(ticketId: number) {
+    if (selectedServicePointId == null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await doneTicket(ticketId);
+      await refetchQueueData(selectedServicePointId);
+      await refreshLookups();
+    } catch (err) {
+      // Completing the underlying step can unlock one or more follow-up
+      // steps — the backend replies with 409 asking staff to designate
+      // which one(s) the patient goes to next instead of completing
+      // anything (same contract as VisitDetail.tsx's completeVisitStep).
+      if (isEligibleNextStepsError(err)) {
+        setPendingDesignation({ ticketId, options: err.body.eligible_next_steps });
+      } else {
+        setError(detailFromError(err) ?? t("formGenericError"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDesignation(selectedIds: number[]) {
+    if (!pendingDesignation || selectedServicePointId == null) return;
+    setDesignateBusy(true);
+    setDesignateError(null);
+    try {
+      await doneTicket(pendingDesignation.ticketId, selectedIds);
+      await refetchQueueData(selectedServicePointId);
+      await refreshLookups();
+      setPendingDesignation(null);
+    } catch (err) {
+      setDesignateError(detailFromError(err) ?? t("designateNextError"));
+    } finally {
+      setDesignateBusy(false);
+    }
+  }
+
   const loading = initialLoading || queueLoading;
 
   return (
@@ -307,7 +369,7 @@ export function QueueConsolePage() {
                           <button
                             type="button"
                             disabled={(ticket.status !== "CALLED" && ticket.status !== "SERVING") || busy}
-                            onClick={() => handleTicketAction(ticket.id, doneTicket)}
+                            onClick={() => handleDone(ticket.id)}
                             className="rounded-md bg-[var(--brand-ink)] px-2.5 py-1 text-[11.5px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {t("ticketActionDone")}
@@ -321,6 +383,19 @@ export function QueueConsolePage() {
             </div>
           )}
         </>
+      )}
+
+      {pendingDesignation && (
+        <DesignateNextStepModal
+          options={pendingDesignation.options}
+          busy={designateBusy}
+          error={designateError}
+          onConfirm={confirmDesignation}
+          onCancel={() => {
+            setPendingDesignation(null);
+            setDesignateError(null);
+          }}
+        />
       )}
     </div>
   );

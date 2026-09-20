@@ -1,6 +1,6 @@
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
+from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -10,6 +10,50 @@ from accounts.permissions import RoleRequired
 
 from .models import Queue, QueueTicket, ServiceSchedule
 from .serializers import QueueSerializer, QueueTicketSerializer, ServiceScheduleSerializer
+
+# Mirrors visits/viewsets.py's `_eligible_next_step_option_schema` /
+# `_designation_required_response_schema` — duplicated (rather than imported
+# across apps) to keep queues/visits decoupled at the viewset layer; the
+# actual eligibility logic itself lives once in `visits.services`
+# (`eligible_next_steps`/`eligible_next_steps_payload`) and is shared.
+_eligible_next_step_option_schema = inline_serializer(
+    name="QueueTicketEligibleNextStepOption",
+    fields={
+        "id": serializers.IntegerField(),
+        "service_point": inline_serializer(
+            name="QueueTicketEligibleNextStepServicePoint",
+            fields={
+                "id": serializers.IntegerField(),
+                "name_th": serializers.CharField(),
+                "name_en": serializers.CharField(),
+            },
+        ),
+        "waiting_count": serializers.IntegerField(),
+    },
+)
+_designation_required_response_schema = inline_serializer(
+    name="QueueTicketDesignationRequiredResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "eligible_next_steps": serializers.ListField(child=_eligible_next_step_option_schema),
+    },
+)
+_done_request_schema = inline_serializer(
+    name="DoneQueueTicketRequest",
+    fields={
+        "next_step_ids": serializers.ListField(
+            child=serializers.IntegerField(),
+            required=False,
+            help_text=(
+                "Ids of the eligible-next VisitSteps (from a prior 409's "
+                "eligible_next_steps) that staff designates as where the "
+                "patient goes next. Omit to get the 409 preview when "
+                "completing this step would unlock one or more follow-up "
+                "steps — same contract as VisitStepViewSet.complete."
+            ),
+        ),
+    },
+)
 
 
 @extend_schema_view(
@@ -117,7 +161,9 @@ class QueueViewSet(viewsets.ReadOnlyModelViewSet):
         description=(
             "Allowed from `CALLED` or `SERVING`. Completes the underlying "
             "`VisitStep` (delegates to `visits.services.complete_step`). "
-            "400 if the ticket is in any other status."
+            "Same `next_step_ids` / 409-preview next-step designation "
+            "contract as `VisitStepViewSet.complete`. 400 if the ticket is "
+            "in any other status."
         ),
     ),
 )
@@ -162,19 +208,57 @@ class QueueTicketViewSet(viewsets.ReadOnlyModelViewSet):
         summary="Mark the ticket as DONE",
         description=(
             "Allowed from `CALLED` or `SERVING`. Completes the underlying "
-            "`VisitStep` (delegates to `visits.services.complete_step`). "
-            "400 if the ticket is in any other status."
+            "`VisitStep` (delegates to `visits.services.complete_step`). If "
+            "completing that step would unlock one or more follow-up "
+            "PENDING steps and the request did not include `next_step_ids`, "
+            "returns 409 with the eligible options instead of completing "
+            "anything — same `next_step_ids` / 409-preview designation "
+            "contract as `VisitStepViewSet.complete` (GAP.md FR-19/FR-21), "
+            "so finishing a step from the Queue Console designates the "
+            "patient's next destination just like finishing it from the "
+            "Visit Detail page does. 400 if the ticket is in any other "
+            "status, or if next_step_ids contains an invalid/ineligible id."
         ),
-        request=None,
-        responses={200: QueueTicketSerializer, 400: {"description": "Ticket cannot be marked done in its current state."}},
+        request=_done_request_schema,
+        responses={
+            200: QueueTicketSerializer,
+            400: {
+                "description": "Ticket cannot be marked done in its current state, "
+                "or next_step_ids contains an invalid/ineligible id.",
+            },
+            409: _designation_required_response_schema,
+        },
     )
     @action(detail=True, methods=["post"])
     def done(self, request, pk=None):
-        from visits.services import complete_step  # visits already depends on queues; keep the reverse edge local
+        # visits already depends on queues; keep the reverse edge local.
+        from visits import services as visit_services
+        from visits.models import VisitStep
 
         ticket = self.get_object()
         if ticket.status not in (QueueTicket.Status.CALLED, QueueTicket.Status.SERVING):
             return Response({"detail": f"Ticket is {ticket.status}, cannot be marked done."}, status=400)
-        complete_step(ticket.visit_step)
+
+        step = ticket.visit_step
+        eligible_next = visit_services.eligible_next_steps(step.visit, step)
+        next_step_ids = request.data.get("next_step_ids")
+
+        if eligible_next and next_step_ids is None:
+            return Response(visit_services.eligible_next_steps_payload(eligible_next), status=409)
+
+        if next_step_ids is not None:
+            eligible_ids = {s.id for s in eligible_next}
+            invalid = [nid for nid in next_step_ids if nid not in eligible_ids]
+            if invalid:
+                return Response(
+                    {"detail": f"next_step_ids contains ids that are not eligible next steps for this visit: {invalid}"},
+                    status=400,
+                )
+
+        visit_services.complete_step(step)
+
+        if next_step_ids:
+            VisitStep.objects.filter(id__in=next_step_ids).update(is_next=True)
+
         ticket.refresh_from_db()
         return Response(QueueTicketSerializer(ticket).data)

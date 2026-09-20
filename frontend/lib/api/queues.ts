@@ -55,8 +55,16 @@ export function serveTicket(id: number): Promise<QueueTicket> {
   return apiFetch<QueueTicket>(`/queues/queue-tickets/${id}/serve`, { method: "POST" });
 }
 
-export function doneTicket(id: number): Promise<QueueTicket> {
-  return apiFetch<QueueTicket>(`/queues/queue-tickets/${id}/done`, { method: "POST" });
+/** `nextStepIds` designates which of a prior 409's `eligible_next_steps` the
+ * patient goes to next — same `next_step_ids` / 409-preview mechanism as
+ * `completeVisitStep` (see EligibleNextStepsError in lib/api/visits.ts).
+ * Omit it to get that 409 preview when completing this step would unlock
+ * follow-up step(s). */
+export function doneTicket(id: number, nextStepIds?: number[]): Promise<QueueTicket> {
+  return apiFetch<QueueTicket>(`/queues/queue-tickets/${id}/done`, {
+    method: "POST",
+    body: nextStepIds !== undefined ? JSON.stringify({ next_step_ids: nextStepIds }) : undefined,
+  });
 }
 
 /** Per-service-point average wait time (minutes) + DONE-step count for a

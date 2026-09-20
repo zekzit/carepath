@@ -16,52 +16,6 @@ from .models import Patient, Visit, VisitStep
 from .serializers import PatientSerializer, VisitSerializer, VisitStepSerializer
 
 
-def _eligible_next_steps(visit, completing_or_skipping_step):
-    """PENDING VisitSteps in `visit` (other than the step itself) that would
-    become eligible once `completing_or_skipping_step` is counted as
-    resolved — i.e. every one of their `prerequisite_steps` is either
-    already DONE, or IS `completing_or_skipping_step`. Shared by
-    complete/skip's 409-preview + `next_step_ids` designation mechanism
-    (GAP.md FR-19/FR-21) so the two actions don't duplicate this logic."""
-    candidates = (
-        visit.steps.filter(status=VisitStep.Status.PENDING)
-        .exclude(id=completing_or_skipping_step.id)
-        .select_related("service_point")
-        .prefetch_related("prerequisite_steps")
-    )
-    eligible = []
-    for candidate in candidates:
-        prereqs = list(candidate.prerequisite_steps.all())
-        if all(
-            p.id == completing_or_skipping_step.id or p.status == VisitStep.Status.DONE
-            for p in prereqs
-        ):
-            eligible.append(candidate)
-    return eligible
-
-
-def _eligible_next_steps_payload(eligible_next):
-    """Body for the 409 "designate next step(s)" preview response."""
-    return {
-        "detail": (
-            "This step unlocks one or more follow-up steps — specify "
-            "next_step_ids to designate which the patient goes to next."
-        ),
-        "eligible_next_steps": [
-            {
-                "id": s.id,
-                "service_point": {
-                    "id": s.service_point_id,
-                    "name_th": s.service_point.name_th,
-                    "name_en": s.service_point.name_en,
-                },
-                "waiting_count": waiting_count_for_service_point(s.service_point),
-            }
-            for s in eligible_next
-        ],
-    }
-
-
 _eligible_next_step_option_schema = inline_serializer(
     name="EligibleNextStepOption",
     fields={
@@ -314,11 +268,11 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
         if step.status != VisitStep.Status.IN_PROGRESS:
             return Response({"detail": f"Step is {step.status}, not IN_PROGRESS."}, status=400)
 
-        eligible_next = _eligible_next_steps(step.visit, step)
+        eligible_next = services.eligible_next_steps(step.visit, step)
         next_step_ids = request.data.get("next_step_ids")
 
         if eligible_next and next_step_ids is None:
-            return Response(_eligible_next_steps_payload(eligible_next), status=409)
+            return Response(services.eligible_next_steps_payload(eligible_next), status=409)
 
         if next_step_ids is not None:
             eligible_ids = {s.id for s in eligible_next}
@@ -366,11 +320,11 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
         if step.status in (VisitStep.Status.DONE, VisitStep.Status.SKIPPED):
             return Response({"detail": f"Step is already {step.status}."}, status=400)
 
-        eligible_next = _eligible_next_steps(step.visit, step)
+        eligible_next = services.eligible_next_steps(step.visit, step)
         next_step_ids = request.data.get("next_step_ids")
 
         if eligible_next and next_step_ids is None:
-            return Response(_eligible_next_steps_payload(eligible_next), status=409)
+            return Response(services.eligible_next_steps_payload(eligible_next), status=409)
 
         if next_step_ids is not None:
             eligible_ids = {s.id for s in eligible_next}

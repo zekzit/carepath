@@ -59,6 +59,55 @@ def complete_step(step: VisitStep) -> None:
     sync_visit_completion(step.visit)
 
 
+def eligible_next_steps(visit, completing_or_skipping_step):
+    """PENDING VisitSteps in `visit` (other than the step itself) that would
+    become eligible once `completing_or_skipping_step` is counted as
+    resolved — i.e. every one of their `prerequisite_steps` is either
+    already DONE, or IS `completing_or_skipping_step`. Shared by every
+    "complete/skip a step" entry point (VisitStepViewSet.complete/skip and
+    QueueTicketViewSet.done) so they don't duplicate this logic or drift out
+    of sync (GAP.md FR-19/FR-21)."""
+    candidates = (
+        visit.steps.filter(status=VisitStep.Status.PENDING)
+        .exclude(id=completing_or_skipping_step.id)
+        .select_related("service_point")
+        .prefetch_related("prerequisite_steps")
+    )
+    eligible = []
+    for candidate in candidates:
+        prereqs = list(candidate.prerequisite_steps.all())
+        if all(
+            p.id == completing_or_skipping_step.id or p.status == VisitStep.Status.DONE
+            for p in prereqs
+        ):
+            eligible.append(candidate)
+    return eligible
+
+
+def eligible_next_steps_payload(eligible_next):
+    """Body for the 409 "designate next step(s)" preview response."""
+    from queues.services import waiting_count_for_service_point  # local import: visits already depends on queues elsewhere in this module
+
+    return {
+        "detail": (
+            "This step unlocks one or more follow-up steps — specify "
+            "next_step_ids to designate which the patient goes to next."
+        ),
+        "eligible_next_steps": [
+            {
+                "id": s.id,
+                "service_point": {
+                    "id": s.service_point_id,
+                    "name_th": s.service_point.name_th,
+                    "name_en": s.service_point.name_en,
+                },
+                "waiting_count": waiting_count_for_service_point(s.service_point),
+            }
+            for s in eligible_next
+        ],
+    }
+
+
 def skip_step(step: VisitStep) -> None:
     from queues.models import QueueTicket
 
