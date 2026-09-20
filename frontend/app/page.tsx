@@ -44,7 +44,7 @@ export default function Home() {
           {t("openPatient")}
         </Link>
         <Link
-          href="/kiosk/demo-kiosk-01"
+          href="/kiosk"
           className="rounded-lg border border-[var(--border-subtle)] px-4 py-2.5 text-center text-sm font-semibold text-[var(--ink)]"
         >
           {t("openKiosk")}
