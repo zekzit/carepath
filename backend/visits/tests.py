@@ -83,3 +83,64 @@ class InsertUnplannedStepOrderingTests(TestCase):
             dental_step.sequence_order,
             "finance step must display after the newly inserted dental step",
         )
+
+    def test_pending_step_depending_on_current_is_auto_chained(self):
+        """Without any insert_before_step_ids, a PENDING step that already
+        depends on current_step must automatically get the new step added
+        as an extra prerequisite too, instead of becoming eligible in
+        parallel with it once current_step resolves."""
+        next_step = VisitStep.objects.create(
+            visit=self.visit, service_point=self.finance, sequence_order=2
+        )
+        next_step.prerequisite_steps.set([self.consult_step])
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            f"/api/visits/visit-steps/{self.consult_step.id}/insert-next/",
+            {"service_point": self.dental.id},
+            format="json",
+        )
+        force_authenticate(request, user=self.staff)
+        view = VisitStepViewSet.as_view({"post": "insert_next"})
+        response = view(request, pk=self.consult_step.id)
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+        next_step.refresh_from_db()
+        dental_step = VisitStep.objects.get(service_point=self.dental)
+
+        self.assertIn(dental_step, next_step.prerequisite_steps.all())
+        self.assertGreater(
+            next_step.sequence_order,
+            dental_step.sequence_order,
+            "the pre-existing next step must display after the newly inserted step",
+        )
+
+    def test_insert_on_already_done_step_is_immediately_designated(self):
+        """If staff inserts an unplanned step anchored to a step that is
+        already DONE/SKIPPED, that anchor can never be completed/skipped
+        again, so the normal next_step_ids designation mechanism will never
+        fire. The new step's sole prerequisite is already satisfied, so it
+        must be given is_next=True immediately or it would be stuck PENDING
+        forever — silently vanishing from the visit's next_steps and making
+        the visit look "fully complete" to the patient/kiosk portal even
+        though this step is still outstanding."""
+        self.consult_step.status = VisitStep.Status.DONE
+        self.consult_step.save(update_fields=["status"])
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            f"/api/visits/visit-steps/{self.consult_step.id}/insert-next/",
+            {"service_point": self.dental.id},
+            format="json",
+        )
+        force_authenticate(request, user=self.staff)
+        view = VisitStepViewSet.as_view({"post": "insert_next"})
+        response = view(request, pk=self.consult_step.id)
+
+        self.assertEqual(response.status_code, 201, response.data)
+        dental_step = VisitStep.objects.get(service_point=self.dental)
+        self.assertTrue(
+            dental_step.is_next,
+            "step inserted after an already-resolved anchor must be designated immediately",
+        )

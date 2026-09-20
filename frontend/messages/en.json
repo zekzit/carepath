@@ -356,8 +356,6 @@
     "insertStepTitle": "Add an unplanned step",
     "insertStepCurrentStepLabel": "Current step (where staff is standing now)",
     "insertStepServicePointLabel": "Send patient to",
-    "insertStepBeforeLabel": "Required before:",
-    "insertStepBeforeHint": "Select any already-pending steps that must now wait for this new step first.",
     "insertStepSubmit": "Add step",
     "insertStepCancel": "Cancel",
     "insertStepAddedConfirmation": "Added — {count} people waiting at that service point already.",

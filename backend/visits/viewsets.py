@@ -358,17 +358,26 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
             "new ad-hoc (`is_planned=False`) VisitStep at `service_point` "
             "for the same visit (e.g. a doctor ordering an extra chest "
             "X-ray mid-consult). The new step's sole prerequisite is `{id}`'s "
-            "step. Every step named in `insert_before_step_ids` additionally "
+            "step. Any already-PENDING step that currently depends on `{id}`'s "
+            "step is AUTOMATICALLY given the new step as an extra prerequisite "
+            "too, so it waits for the unplanned step instead of becoming "
+            "eligible in parallel with it. `insert_before_step_ids` still "
+            "works the same way for any additional, non-obvious targets — "
             "gets the new step ADDED to its existing prerequisites (never "
             "replacing them), so existing ordering is only tightened, never "
             "broken. `sequence_order` for every other step in the visit at "
             "or after the insertion point — and for any `insert_before_step_ids` "
             "target that was sequenced earlier (e.g. on another branch) — is "
             "adjusted for display purposes only; `prerequisite_steps` is what "
-            "actually enforces ordering. The new step starts with `is_next=False`; it becomes "
-            "designable the moment `{id}`'s step is completed/skipped, via "
-            "that action's `next_step_ids` mechanism, with no special-case "
-            "wiring needed. See GAP.md FR-20."
+            "actually enforces ordering. If `{id}`'s step is still PENDING or "
+            "IN_PROGRESS, the new step starts with `is_next=False` and "
+            "becomes designable the moment `{id}`'s step is completed/skipped, "
+            "via that action's `next_step_ids` mechanism, with no special-case "
+            "wiring needed. If `{id}`'s step is already `DONE`/`SKIPPED`, its "
+            "prerequisite is already satisfied and it will never be "
+            "completed/skipped again — so the new step is immediately given "
+            "`is_next=True` instead, or it would be stuck PENDING forever. "
+            "See GAP.md FR-20."
         ),
         request=inline_serializer(
             name="InsertNextStepRequest",
@@ -438,6 +447,16 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
                 status=400,
             )
 
+        # Any already-PENDING step that depends on current_step would
+        # otherwise become eligible in parallel with the new step the moment
+        # current_step resolves (see services.eligible_next_steps). Chain them
+        # automatically so the insert is sequential, not parallel, without
+        # staff having to hand-pick targets via insert_before_step_ids.
+        auto_targets = current_step.dependent_steps.filter(
+            visit=visit, status=VisitStep.Status.PENDING
+        ).exclude(id__in=found_ids)
+        insert_before_steps += list(auto_targets)
+
         with transaction.atomic():
             new_sequence_order = current_step.sequence_order + 1
             VisitStep.objects.filter(visit=visit, sequence_order__gte=new_sequence_order).update(
@@ -448,6 +467,13 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
                 service_point=node,
                 sequence_order=new_sequence_order,
                 is_planned=False,
+                # current_step is already DONE/SKIPPED, so it can never be
+                # completed/skipped again to designate this step via the
+                # normal next_step_ids mechanism (complete/skip both reject
+                # a step that isn't IN_PROGRESS/PENDING) — the sole
+                # prerequisite is already resolved, so designate it now or
+                # it would be permanently stuck PENDING/is_next=False.
+                is_next=current_step.status in (VisitStep.Status.DONE, VisitStep.Status.SKIPPED),
             )
             new_step.prerequisite_steps.set([current_step])
 

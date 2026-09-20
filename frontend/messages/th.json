@@ -356,8 +356,6 @@
     "insertStepTitle": "เพิ่มขั้นตอนที่ไม่ได้วางแผนไว้",
     "insertStepCurrentStepLabel": "ขั้นตอนปัจจุบัน (จุดที่เจ้าหน้าที่อยู่ตอนนี้)",
     "insertStepServicePointLabel": "ส่งผู้ป่วยไปที่",
-    "insertStepBeforeLabel": "ต้องทำก่อน:",
-    "insertStepBeforeHint": "เลือกขั้นตอนที่รออยู่ซึ่งต้องรอขั้นตอนใหม่นี้ให้เสร็จก่อน",
     "insertStepSubmit": "เพิ่มขั้นตอน",
     "insertStepCancel": "ยกเลิก",
     "insertStepAddedConfirmation": "เพิ่มแล้ว — มีคนรออยู่ที่จุดนั้น {count} คน",
