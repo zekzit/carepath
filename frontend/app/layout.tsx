@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
@@ -16,6 +16,15 @@ export const metadata: Metadata = {
     default: "CarePath",
   },
   description: "Patient navigation system — Admin / Patient / Kiosk portals",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f3733",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
