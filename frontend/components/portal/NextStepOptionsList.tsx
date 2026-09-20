@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { AppLocale } from "@/i18n/locales";
 import type { RouteLeg, RouteResult } from "@/lib/api/facility";
@@ -114,6 +114,7 @@ function SingleOption({
   const directionTitle = useTranslations(variant === "kiosk" ? "kiosk.direction" : "patient")(
     variant === "kiosk" ? "title" : "directionTitle",
   );
+  const directionRef = useRef<HTMLDivElement>(null);
 
   return (
     <>
@@ -127,15 +128,23 @@ function SingleOption({
         />
       )}
       {direction && (
-        <DirectionBlock
-          direction={direction}
-          destination={compassTarget}
-          locale={locale}
-          scale={scale}
-          title={directionTitle}
-        />
+        <div ref={directionRef}>
+          <DirectionBlock
+            direction={direction}
+            destination={compassTarget}
+            locale={locale}
+            scale={scale}
+            title={directionTitle}
+          />
+        </div>
       )}
-      <NextStepCard nextStep={option} scale={scale} />
+      <NextStepCard
+        nextStep={option}
+        scale={scale}
+        onNavigate={
+          direction ? () => directionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined
+        }
+      />
       <QueueWidget
         ticket={option.queue_ticket}
         locationName={serviceStepLocationName(option, locale)}

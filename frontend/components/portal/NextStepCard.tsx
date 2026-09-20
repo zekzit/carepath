@@ -20,9 +20,14 @@ type Scale = "default" | "kiosk";
 export function NextStepCard({
   nextStep,
   scale = "default",
+  onNavigate,
 }: {
   nextStep: { service_point: PublicVisitServicePoint };
   scale?: Scale;
+  /** Scrolls to the compass/route guidance above this card. Omitted (button
+   * disabled) when no DirectionBlock is rendered — e.g. the Patient Portal
+   * before the patient has scanned a location. */
+  onNavigate?: () => void;
 }) {
   const t = useTranslations("patient");
   const locale = useLocale() as AppLocale;
@@ -40,7 +45,9 @@ export function NextStepCard({
       </div>
       <button
         type="button"
-        className={`mt-0.5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-amber)] font-bold text-[var(--brand-amber-ink)] ${
+        onClick={onNavigate}
+        disabled={!onNavigate}
+        className={`mt-0.5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-amber)] font-bold text-[var(--brand-amber-ink)] disabled:cursor-not-allowed disabled:opacity-50 ${
           isKiosk ? "px-4 py-4 text-[16px]" : "px-3 py-3 text-[14.5px]"
         }`}
       >
