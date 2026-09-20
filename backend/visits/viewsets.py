@@ -1,6 +1,5 @@
 from django.db import transaction
 from django.db.models import F
-from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
@@ -10,7 +9,7 @@ from accounts.models import StaffUser
 from accounts.permissions import RoleRequired
 from accounts.services import log_action
 from facility.models import Node
-from queues.services import ensure_ticket_for_step, waiting_count_for_service_point
+from queues.services import waiting_count_for_service_point
 
 from . import services
 from .models import Patient, Visit, VisitStep
@@ -287,15 +286,8 @@ class VisitStepViewSet(viewsets.ReadOnlyModelViewSet):
                 {"detail": "All prerequisite steps must be DONE before this step can start."}, status=400
             )
 
-        step.status = VisitStep.Status.IN_PROGRESS
-        step.started_at = timezone.now()
-        step.save(update_fields=["status", "started_at"])
-
-        if step.visit.status == Visit.Status.REGISTERED:
-            step.visit.status = Visit.Status.IN_PROGRESS
-            step.visit.save(update_fields=["status"])
-
-        ensure_ticket_for_step(step)
+        services.start_step(step)
+        step.refresh_from_db()
         log_action(request.user, "START_VISIT_STEP", "VisitStep", step.id, {"visit": step.visit_id})
         return Response(VisitStepSerializer(step).data)
 

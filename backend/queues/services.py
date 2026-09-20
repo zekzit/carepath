@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, F
+from django.db.models import Avg, Count, F, Max
 from django.utils import timezone
 
 from facility.models import Node

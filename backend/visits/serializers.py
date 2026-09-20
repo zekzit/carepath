@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from pathway.models import TemplateStep
 
+from . import services
 from .models import Patient, Visit, VisitStep
 
 
@@ -75,6 +76,7 @@ class VisitSerializer(serializers.ModelSerializer):
     visit_date = serializers.DateField(help_text="Date of the visit (one visit per day).")
     status = serializers.ChoiceField(
         choices=Visit.Status.choices,
+        read_only=True,
         help_text="REGISTERED → IN_PROGRESS → DONE. Set by the server — callers can't write it directly.",
     )
     qr_token = serializers.CharField(
@@ -134,22 +136,24 @@ class VisitSerializer(serializers.ModelSerializer):
             )
             for template_step in template_steps
         }
-        root_step_ids = []
+        root_steps = []
         for template_step in template_steps:
             prereq_ids = [p.id for p in template_step.prerequisite_steps.all()]
             if not prereq_ids:
-                root_step_ids.append(step_by_template_id[template_step.id].id)
+                root_steps.append(step_by_template_id[template_step.id])
                 continue
             step_by_template_id[template_step.id].prerequisite_steps.set(
                 [step_by_template_id[pid] for pid in prereq_ids if pid in step_by_template_id]
             )
 
-        # Auto-designate the pathway's root step(s) — those with zero
-        # prerequisite_steps — as staff-designated "next" so registration ->
-        # immediate first check-in keeps working without an extra explicit
-        # designate call. There can be more than one when a template's
+        # Auto-designate AND auto-start the pathway's root step(s) — those
+        # with zero prerequisite_steps — so registration opens the visit
+        # straight into its first step(s) instead of leaving staff to click
+        # "start" themselves. There can be more than one when a template's
         # first steps fan out in parallel. See GAP.md FR-19/FR-21.
-        if root_step_ids:
-            VisitStep.objects.filter(id__in=root_step_ids).update(is_next=True)
+        if root_steps:
+            VisitStep.objects.filter(id__in=[s.id for s in root_steps]).update(is_next=True)
+            for step in root_steps:
+                services.start_step(step)
 
         return visit
